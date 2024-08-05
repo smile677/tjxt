@@ -281,7 +281,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             return;
         }
         // 3.判断订单所属用户与当前登录用户是否一致 -128~127 之间是同一个对象 Long底层是使用valueOf方法中的LongCache
-        if (userId.equals(order.getUserId())) {
+        if (!userId.equals(order.getUserId())) {
             // 不一致，说明不是当前用户的订单，结束
             throw new BadRequestException("不能删除他人订单");
         }
