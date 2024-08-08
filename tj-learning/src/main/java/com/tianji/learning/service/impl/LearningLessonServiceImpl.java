@@ -1,10 +1,18 @@
 package com.tianji.learning.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.api.client.course.CourseClient;
 import com.tianji.api.dto.course.CourseSimpleInfoDTO;
+import com.tianji.common.domain.dto.PageDTO;
+import com.tianji.common.domain.query.PageQuery;
+import com.tianji.common.exceptions.BadRequestException;
+import com.tianji.common.exceptions.BizIllegalException;
+import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
+import com.tianji.common.utils.UserContext;
 import com.tianji.learning.domain.po.LearningLesson;
+import com.tianji.learning.domain.vo.LearningLessonVO;
 import com.tianji.learning.service.ILearningLessonService;
 import com.tianji.learning.mapper.LearningLessonMapper;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +22,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * @author smile67
@@ -55,6 +66,44 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
 
         // 批量保存 计算过期时间
         saveBatch(list);
+    }
+
+    @Override
+    public PageDTO<LearningLessonVO> queryMyLessons(PageQuery query) {
+        // 获取当前登录人
+        Long userId = UserContext.getUser();
+        if (userId == null) {
+            throw new BadRequestException("必须登录");
+        }
+        // 分页查询我的课表
+        Page<LearningLesson> page = this.lambdaQuery().eq(LearningLesson::getUserId, userId)
+                .page(query.toMpPage("latest_learn_time", false));
+        List<LearningLesson> records = page.getRecords();
+        if (CollUtils.isEmpty(records)) {
+            return PageDTO.empty(page);
+        }
+        // 远程调用课程服务，给vo中的课程名、封面、章节数赋值
+        Set<Long> courseIds = records.stream().map(LearningLesson::getUserId).collect(Collectors.toSet());
+        List<CourseSimpleInfoDTO> cinfos = courseClient.getSimpleInfoList(courseIds);
+        if (CollUtils.isEmpty(cinfos)) {
+            throw new BizIllegalException("课程不存在");
+        }
+        // 将cinfos课程集合转换为map结构<课程id,课程对象>
+        Map<Long, CourseSimpleInfoDTO> infoDTOMap = cinfos.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, cinfo -> cinfo));
+        // 将po中的数据封装到vo中
+        List<LearningLessonVO> voList = new ArrayList<>();
+        for (LearningLesson learningLessonRecord : records) {
+            LearningLessonVO learningLessonVO = BeanUtils.copyBean(learningLessonRecord, LearningLessonVO.class);
+            CourseSimpleInfoDTO infoDTO = infoDTOMap.get(learningLessonRecord.getCourseId());
+            if (infoDTO != null) {
+                learningLessonVO.setCourseCoverUrl(infoDTO.getCoverUrl());
+                learningLessonVO.setCourseName(infoDTO.getName());
+                learningLessonVO.setSections(infoDTO.getSectionNum());
+            }
+            voList.add(learningLessonVO);
+        }
+        // 返回
+        return PageDTO.of(page, voList);
     }
 }
 
