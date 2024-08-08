@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.learning.mapper.LearningLessonMapper">
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.tianji.learning.domain.po.LearningLesson">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="courseId" column="course_id"/>
+        <result property="status" column="status"/>
+        <result property="weekFreq" column="week_freq"/>
+        <result property="planStatus" column="plan_status"/>
+        <result property="learnedSections" column="learned_sections"/>
+        <result property="latestSectionId" column="latest_section_id"/>
+        <result property="latestLearnTime" column="latest_learn_id"/>
+        <result property="createTime" column="create_time"/>
+        <result property="expireTime" column="expire_time"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id,user_id,course_id,
+        status,week_freq,plan_status,
+        learned_sections,latest_section_id,latest_learn_time,
+        create_time,expire_time,update_time
+    </sql>
+</mapper>
