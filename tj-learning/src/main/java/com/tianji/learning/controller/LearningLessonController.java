@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 学生课表控制器
+ * @author smile67
  */
 @RestController
 @RequestMapping("/lessons")

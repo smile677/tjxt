@@ -154,7 +154,8 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         learningLessonVO.setCourseName(cinfo.getName());
         learningLessonVO.setCourseCoverUrl(cinfo.getCoverUrl());
         learningLessonVO.setSections(cinfo.getSectionNum());
-        learningLessonVO.setCourseAmount(count);// 当前用户能学习的课程总数
+        // 当前用户能学习的课程总数
+        learningLessonVO.setCourseAmount(count);
         CataSimpleInfoDTO cataSimpleInfoDTO = cataSimpleInfoDTOS.get(0);
         learningLessonVO.setLatestSectionName(cataSimpleInfoDTO.getName());
         learningLessonVO.setLatestSectionIndex(cataSimpleInfoDTO.getCIndex());

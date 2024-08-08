@@ -14,6 +14,9 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 
+/**
+ * @author smile67
+ */
 @Component
 @Slf4j
 @RequiredArgsConstructor // 使用构造器 Lombok是在编译期间生成相应的方法
