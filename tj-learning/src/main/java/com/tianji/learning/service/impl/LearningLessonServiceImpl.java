@@ -41,8 +41,9 @@ import java.util.stream.Collectors;
 public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper, LearningLesson>
         implements ILearningLessonService {
 
-    final CourseClient courseClient;
+    private final CourseClient courseClient;
     private final CatalogueClient catalogueClient;
+//    private ILearningRecordService learningRecordService; // 会产生循环依赖
 
     @Override
     public void addUserLesson(Long userId, List<Long> courseIds) {
@@ -112,7 +113,7 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
     }
 
     @Override
-    public LearningLessonVO quearyMyCurrentLesson() {
+    public LearningLessonVO queryMyCurrentLesson() {
         // 获取当前登录用户
         Long userId = UserContext.getUser();
         if (userId == null) {

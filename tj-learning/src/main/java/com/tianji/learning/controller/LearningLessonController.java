@@ -33,7 +33,7 @@ public class LearningLessonController {
     @ApiOperation("查询正在学习的课程")
     @GetMapping("/now")
     public LearningLessonVO quearyMyCurrentLesson() {
-        return learningLessonService.quearyMyCurrentLesson();
+        return learningLessonService.queryMyCurrentLesson();
     }
 
 

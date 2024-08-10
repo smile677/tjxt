@@ -3,6 +3,7 @@ package com.tianji.learning.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.tianji.learning.domain.po.LearningLesson;
+import org.apache.ibatis.annotations.Mapper;
 
 /**
 * @author smile67
@@ -10,6 +11,7 @@ import com.tianji.learning.domain.po.LearningLesson;
 * @createDate 2024-08-07 08:52:25
 * @Entity generator.domain.LearningLesson
 */
+@Mapper
 public interface LearningLessonMapper extends BaseMapper<LearningLesson> {
 
 }
