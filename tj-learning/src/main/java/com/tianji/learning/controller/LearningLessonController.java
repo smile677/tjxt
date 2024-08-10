@@ -8,11 +8,13 @@ import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * 学生课表控制器
+ *
  * @author smile67
  */
 @RestController
@@ -21,14 +23,28 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class LearningLessonController {
     final ILearningLessonService learningLessonService;
+
     @ApiOperation("分页查询我的课程列表")
     @GetMapping("/page")
-    public PageDTO<LearningLessonVO> queryMyLesson(PageQuery query){
-       return learningLessonService.queryMyLessons(query);
+    public PageDTO<LearningLessonVO> queryMyLesson(PageQuery query) {
+        return learningLessonService.queryMyLessons(query);
     }
+
     @ApiOperation("查询正在学习的课程")
     @GetMapping("/now")
-    public LearningLessonVO quearyMyCurrentLesson(){
+    public LearningLessonVO quearyMyCurrentLesson() {
         return learningLessonService.quearyMyCurrentLesson();
+    }
+
+
+    /**
+     * 校验当前用户是否可以学习当前课程
+     * @param courseId 课程id
+     * @return lessonId 如果用户报名了则返回lessonId，否则返回null
+     */
+    @ApiOperation("校验当前用户是否可以学习当前课程")
+    @GetMapping("/{courseId}/valid")
+    public Long isLessonValid(@PathVariable("courseId") Long courseId) {
+        return learningLessonService.isLessonValid(courseId);
     }
 }

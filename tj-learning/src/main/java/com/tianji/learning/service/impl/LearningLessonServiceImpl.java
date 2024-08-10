@@ -162,6 +162,27 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
 
         return learningLessonVO;
     }
+
+    @Override
+    public Long isLessonValid(Long courseId) {
+        // 1.获取当前登录用户id
+        Long userId = UserContext.getUser();
+        // 2.查询课表learning_lesson 条件 user_id course_id
+        LearningLesson lesson = this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if (lesson == null) {
+            return null;
+        }
+        // 校验课程是否过期
+        LocalDateTime expireTime = lesson.getExpireTime();
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isAfter(expireTime)) {
+            return null;
+        }
+        return lesson.getId();
+    }
 }
 
 
