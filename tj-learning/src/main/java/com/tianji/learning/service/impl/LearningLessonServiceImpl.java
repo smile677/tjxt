@@ -183,6 +183,22 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         }
         return lesson.getId();
     }
+
+    @Override
+    public LearningLessonVO queryLessonByCourseId(Long courseId) {
+        // 1.获取当前登录用户id
+        Long userId = UserContext.getUser();
+        // 2.查询课表learning_lesson 条件 user_id course_id
+        LearningLesson lesson = this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, courseId)
+                .one();
+        if (lesson == null) {
+            return null;
+        }
+        // 3.封装vo
+        return BeanUtils.copyBean(lesson, LearningLessonVO.class);
+    }
 }
 
 

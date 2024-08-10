@@ -24,4 +24,5 @@ public interface ILearningLessonService extends IService<LearningLesson> {
 
     Long isLessonValid(Long courseId);
 
+    LearningLessonVO queryLessonByCourseId(Long courseId);
 }
