@@ -1,16 +1,22 @@
 package com.tianji.learning;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tianji.common.domain.query.PageQuery;
 import com.tianji.learning.domain.po.LearningLesson;
+import com.tianji.learning.domain.po.LearningRecord;
+import com.tianji.learning.enums.LessonStatus;
+import com.tianji.learning.enums.PlanStatus;
+import com.tianji.learning.mapper.LearningRecordMapper;
 import com.tianji.learning.service.ILearningLessonService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -55,6 +61,7 @@ public class MpTest {
             System.out.println("record = " + record);
         }
     }
+
     @Test
     public void test3() {
         Page<LearningLesson> page = new Page<>(1, 2);
@@ -72,7 +79,7 @@ public class MpTest {
 //        learningLessonService.page(page, wrapper);
 
         learningLessonService.lambdaQuery().eq(LearningLesson::getUserId, 2L)
-                        .page(page);
+                .page(page);
         System.out.println("page = " + page.getTotal());
         System.out.println("pages = " + page.getPages());
         List<LearningLesson> records = page.getRecords();
@@ -80,6 +87,7 @@ public class MpTest {
             System.out.println("record = " + record);
         }
     }
+
     @Test
     public void test4() {
         PageQuery query = new PageQuery();
@@ -97,8 +105,9 @@ public class MpTest {
             System.out.println("record = " + record);
         }
     }
+
     @Test
-    public  void test5() {
+    public void test5() {
         List<LearningLesson> list = new ArrayList<>();
         LearningLesson lesson1 = new LearningLesson();
         lesson1.setId(1L);
@@ -128,5 +137,40 @@ public class MpTest {
 
         Map<Long, LearningLesson> map2 = list.stream().collect(Collectors.toMap(LearningLesson::getId, lesson -> lesson));
         System.out.println("map2 = " + map2);
+    }
+
+    @Test
+    public void test6() {
+        QueryWrapper<LearningLesson> wrapper = new QueryWrapper<>();
+        wrapper.select("sum(week_freq) as plansTotal")
+                .eq("user_id", 2)
+                .in("status", LessonStatus.NOT_BEGIN, LessonStatus.LEARNING)
+                .eq("plan_status", PlanStatus.PLAN_RUNNING);
+        Map<String, Object> map = learningLessonService.getMap(wrapper);
+        System.out.println("map = " + map.get("plansTotal"));
+        if (map != null && map.get("plansTotal") != null) {
+            Integer a = Integer.valueOf(map.get("plansTotal").toString());
+            System.out.println("a = " + a);
+            BigDecimal plansTotal = (BigDecimal) map.get("plansTotal");
+            int b = plansTotal.intValue();
+            System.out.println("b = " + b);
+        }
+    }
+
+    @Autowired
+    private LearningRecordMapper learningRecordMapper;
+
+    @Test
+    public void test7() {
+        QueryWrapper<LearningRecord> rwrapper = new QueryWrapper<>();
+        rwrapper.select("lesson_id,count(*) as userId");
+        rwrapper.eq("user_id", 2);
+        rwrapper.eq("finished", true);
+        rwrapper.between("finish_time", "2024-08-05 00:00:01", "2024-08-11 23:59:59");
+        rwrapper.groupBy("lesson_id");
+        List<LearningRecord> learningRecords = learningRecordMapper.selectList(rwrapper);
+        System.out.println("learningRecords = " + learningRecords);
+        Map<Long, Long> cousreWeekFinishedNumMap = learningRecords.stream().collect(Collectors.toMap(LearningRecord::getLessonId, LearningRecord::getUserId));
+        System.out.println("cousreWeekFinishedNumMap = " + cousreWeekFinishedNumMap);
     }
 }
