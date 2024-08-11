@@ -99,12 +99,13 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
         }
         // 5.更新课表数据
         learningLessonService.lambdaUpdate()
+                .set(learningLesson.getStatus() == LessonStatus.NOT_BEGIN, LearningLesson::getStatus, LessonStatus.LEARNING)
                 .set(learningLesson.getLearnedSections() == 0, LearningLesson::getStatus, LessonStatus.LEARNING)
                 .set(allFinished, LearningLesson::getStatus, LessonStatus.FINISHED)
-                .set(LearningLesson::getLatestSectionId, recordDTO.getSectionId())
-                .set(LearningLesson::getLearnedSections, learningLesson.getLearnedSections() + 1)
+                .set(!isFinished, LearningLesson::getLatestSectionId, recordDTO.getSectionId())
+                .set(!isFinished, LearningLesson::getLatestLearnTime, recordDTO.getCommitTime())
+                .set(isFinished, LearningLesson::getLearnedSections, learningLesson.getLearnedSections() + 1)
 //                .setSql(isFinished, "learned_sections = learned_sections + 1")
-                .set(LearningLesson::getLatestLearnTime, recordDTO.getCommitTime())
                 .eq(LearningLesson::getId, learningLesson.getId())
                 .update();
     }
@@ -137,6 +138,7 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             if (!result) {
                 throw new DbException("新增考试记录失败");
             }
+            return false;
         }
         // 4.如果存在则更新学习记录 learning_record 更新 moment 字段
         // 是否第一次完成(旧状态为未完成 + 本次学习进度超过 50% 为学完)
