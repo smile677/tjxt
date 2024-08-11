@@ -14,9 +14,11 @@ import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.UserContext;
+import com.tianji.learning.domain.dto.LearningPlanDTO;
 import com.tianji.learning.domain.po.LearningLesson;
 import com.tianji.learning.domain.vo.LearningLessonVO;
 import com.tianji.learning.enums.LessonStatus;
+import com.tianji.learning.enums.PlanStatus;
 import com.tianji.learning.service.ILearningLessonService;
 import com.tianji.learning.mapper.LearningLessonMapper;
 import lombok.RequiredArgsConstructor;
@@ -199,6 +201,32 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         }
         // 3.封装vo
         return BeanUtils.copyBean(lesson, LearningLessonVO.class);
+    }
+
+    @Override
+    public void createLearningPlans(LearningPlanDTO learningPlanDTO) {
+        // 1. 获取登录用户
+        Long userId = UserContext.getUser();
+        // 2.查询课表learning_lesson 条件 user_id course_id
+        LearningLesson lesson = this.lambdaQuery()
+                .eq(LearningLesson::getUserId, userId)
+                .eq(LearningLesson::getCourseId, learningPlanDTO.getCourseId())
+                .one();
+        if (lesson == null) {
+            throw new BadRequestException("该课程没有加入到课表");
+        }
+        lesson.setWeekFreq(learningPlanDTO.getFreq());
+        this.updateById(lesson);
+        // 3.修改课表
+        boolean update = this.lambdaUpdate()
+                // 只会更新一个字段
+                .set(LearningLesson::getWeekFreq, learningPlanDTO.getFreq())
+                .set(LearningLesson::getPlanStatus, PlanStatus.PLAN_RUNNING)
+                .eq(LearningLesson::getId, lesson.getId())
+                .update();
+        if (!update) {
+            throw new BadRequestException("创建计划失败");
+        }
     }
 }
 
