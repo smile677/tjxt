@@ -1,13 +1,19 @@
 package com.tianji.learning.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tianji.api.client.course.CourseClient;
+import com.tianji.api.dto.course.CourseFullInfoDTO;
 import com.tianji.api.dto.leanring.LearningLessonDTO;
 import com.tianji.api.dto.leanring.LearningRecordDTO;
 import com.tianji.common.exceptions.BizIllegalException;
+import com.tianji.common.exceptions.DbException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.UserContext;
+import com.tianji.learning.domain.dto.LearningRecordFormDTO;
 import com.tianji.learning.domain.po.LearningLesson;
 import com.tianji.learning.domain.po.LearningRecord;
+import com.tianji.learning.enums.LessonStatus;
+import com.tianji.learning.enums.SectionType;
 import com.tianji.learning.mapper.LearningRecordMapper;
 import com.tianji.learning.service.ILearningLessonService;
 import com.tianji.learning.service.ILearningRecordService;
@@ -26,6 +32,7 @@ import java.util.List;
 public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper, LearningRecord>
         implements ILearningRecordService {
     private final ILearningLessonService learningLessonService;
+    private final CourseClient courseClient;
 
     @Override
     public LearningLessonDTO queryLearningRecordByCourse(Long courseId) {
@@ -51,6 +58,108 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
         learningLessonDTO.setLatestSectionId(lesson.getLatestSectionId());
         learningLessonDTO.setRecords(BeanUtils.copyList(records, LearningRecordDTO.class));
         return learningLessonDTO;
+    }
+
+    @Override
+    public void addLearningRecord(LearningRecordFormDTO recordDTO) {
+        // 1.获取当前登录用户id
+        Long userId = UserContext.getUser();
+        // 2.处理学习记录
+        boolean isFinished = false;
+        if (recordDTO.getSectionType() == SectionType.VIDEO) {
+            // 2.1 提交视频记录
+            isFinished = handleVideoRecord(userId, recordDTO);
+        } else {
+            // 2.2 提交考试记录
+            isFinished = handleExamRecord(userId, recordDTO);
+        }
+        // 3.处理课表数据
+        handleLearnLessonsChanges(recordDTO, isFinished);
+    }
+
+    // 处理课表相关记录
+    private void handleLearnLessonsChanges(LearningRecordFormDTO recordDTO, boolean isFinished) {
+        // 1.查询课表 learning_lesson 条件  lessonId主键
+        LearningLesson learningLesson = learningLessonService.getById(recordDTO.getLessonId());
+        if (learningLesson == null) {
+            throw new BizIllegalException("课表不存在");
+        }
+        // 2.判断是否第一次学完 isFinished 为 true
+        boolean allFinished = false;
+        if (isFinished) {
+            // 3.远程调用课程服务 得到课程信息 小结总数
+            CourseFullInfoDTO cinfo = courseClient.getCourseInfoById(learningLesson.getCourseId(), false, false);
+            if (cinfo == null) {
+                throw new BizIllegalException("课程不存在");
+            }
+            Integer sectionNum = cinfo.getSectionNum();
+            // 4.如果isFinished为true 本小节为第一次学完 判断该用户对课程下全部下节是否学完
+            Integer learnedSections = learningLesson.getLearnedSections();
+            allFinished = learnedSections + 1 >= sectionNum;
+        }
+        // 5.更新课表数据
+        learningLessonService.lambdaUpdate()
+                .set(learningLesson.getLearnedSections() == 0, LearningLesson::getStatus, LessonStatus.LEARNING)
+                .set(allFinished, LearningLesson::getStatus, LessonStatus.FINISHED)
+                .set(LearningLesson::getLatestSectionId, recordDTO.getSectionId())
+                .set(LearningLesson::getLearnedSections, learningLesson.getLearnedSections() + 1)
+//                .setSql(isFinished, "learned_sections = learned_sections + 1")
+                .set(LearningLesson::getLatestLearnTime, recordDTO.getCommitTime())
+                .eq(LearningLesson::getId, learningLesson.getId())
+                .update();
+    }
+
+    // 处理课表数据
+    private boolean handleExamRecord(Long userId, LearningRecordFormDTO recordDTO) {
+        // 1.dto -> po
+        LearningRecord learningRecord = BeanUtils.copyBean(recordDTO, LearningRecord.class);
+        learningRecord.setUserId(userId);
+        learningRecord.setFinished(true);
+        learningRecord.setFinishTime(recordDTO.getCommitTime());
+        // 写入数据库
+        boolean success = this.save(learningRecord);
+        if (!success) {
+            throw new DbException("新增考试记录失败");
+        }
+        return true;
+    }
+
+    // 处理视频播放记录
+    private boolean handleVideoRecord(Long userId, LearningRecordFormDTO recordDTO) {
+        // 1.查询旧的学习记录 learning_record 条件 userId lessonId sectionId
+        LearningRecord oldLearningRecord = queryOldLearningRecord(userId, recordDTO);
+        // 2.判断是否存在
+        if (oldLearningRecord == null) {
+            // 3.如果不存在则新增学习记录
+            LearningRecord learningRecord = BeanUtils.copyBean(recordDTO, LearningRecord.class);
+            learningRecord.setUserId(userId);
+            boolean result = this.save(learningRecord);
+            if (!result) {
+                throw new DbException("新增考试记录失败");
+            }
+        }
+        // 4.如果存在则更新学习记录 learning_record 更新 moment 字段
+        // 是否第一次完成(旧状态为未完成 + 本次学习进度超过 50% 为学完)
+        assert oldLearningRecord != null;
+        boolean isFinished = !oldLearningRecord.getFinished() && recordDTO.getMoment() * 2 >= recordDTO.getDuration();
+        boolean result = this.lambdaUpdate()
+                .set(LearningRecord::getMoment, recordDTO.getMoment())
+                .set(isFinished, LearningRecord::getFinished, true)
+                .set(isFinished, LearningRecord::getFinishTime, recordDTO.getCommitTime())
+                .eq(LearningRecord::getId, oldLearningRecord.getId())
+                .update();
+        if (!result) {
+            throw new DbException("更新视频学习记录失败");
+        }
+        return isFinished;
+    }
+
+    private LearningRecord queryOldLearningRecord(Long userId, LearningRecordFormDTO recordDTO) {
+        return this.lambdaQuery()
+                .eq(LearningRecord::getUserId, userId)
+                .eq(LearningRecord::getLessonId, recordDTO.getLessonId())
+                .eq(LearningRecord::getSectionId, recordDTO.getSectionId())
+                .one();
     }
 }
 
