@@ -1,7 +1,5 @@
 package com.tianji.learning.service.impl;
 
-import cn.hutool.core.lang.func.Func1;
-import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -275,7 +273,8 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         Integer weekFinishedPlanNum = learningRecordMapper.selectCount(Wrappers.<LearningRecord>lambdaQuery()
                 .eq(LearningRecord::getUserId, userId)
                 .eq(LearningRecord::getFinished, true)
-                .between(LearningRecord::getFinished, weekBeginTime, weekEndTime));
+                .between(LearningRecord::getFinishTime, weekBeginTime, weekEndTime));
+
         // 5.查询课表数据 learning_lessons 条件userId status in(0,1) plan_status=1 分页
         Page<LearningLesson> page = this.lambdaQuery()
                 .eq(LearningLesson::getUserId, userId)
@@ -290,13 +289,7 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
             vo.setList(CollUtils.emptyList());
         }
         // 6.远程调用课程服务 获得课程信息
-        Set<Long> courseIds = records.stream().map(learningLesson -> learningLesson.getCourseId()).collect(Collectors.toSet());
-        List<CourseSimpleInfoDTO> cInfos = courseClient.getSimpleInfoList(courseIds);
-        if (CollUtils.isEmpty(cInfos)) {
-            throw new BizIllegalException("课程不存在");
-        }
-        // 将cInfos list转换为map <课程id ,CourseSimpleInfoDTO>
-        Map<Long, CourseSimpleInfoDTO> cInfoDTOMap = cInfos.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, c -> c));
+        Map<Long, CourseSimpleInfoDTO> cInfoDTOMap = getLongCourseSimpleInfoDTOMap(records);
 
         // 7.查询学习记录表 本周 当前用户下 每门课下 已学习的小节数量
         //select lesson_id,count(*) from tj_learning.learning_record
@@ -321,24 +314,36 @@ public class LearningLessonServiceImpl extends ServiceImpl<LearningLessonMapper,
         // todo vo.setWeekPoints();
         vo.setWeekFinished(weekFinishedPlanNum);
         List<LearningPlanVO> voList = new ArrayList<>();
-        for (LearningLesson record : records) {
-            LearningPlanVO learningPlanVO = BeanUtils.copyBean(record, LearningPlanVO.class);
-            CourseSimpleInfoDTO infoDTO = cInfoDTOMap.get(record.getCourseId());
+        for (LearningLesson learningLessonRecord : records) {
+            LearningPlanVO learningPlanVO = BeanUtils.copyBean(learningLessonRecord, LearningPlanVO.class);
+            CourseSimpleInfoDTO infoDTO = cInfoDTOMap.get(learningLessonRecord.getCourseId());
             if (infoDTO != null) {
                 // 课程名
                 learningPlanVO.setCourseName(infoDTO.getName());
                 // 课程下的总小结数
                 learningPlanVO.setSections(infoDTO.getSectionNum());
             }
-            int cousreWeekFinishedNumOrDefault = cousreWeekFinishedNumMap.getOrDefault(record.getId(), 0L).intValue();
+            int cousreWeekFinishedNumOrDefault = cousreWeekFinishedNumMap.getOrDefault(learningLessonRecord.getId(), 0L).intValue();
             // 本周已经学章节数
             learningPlanVO.setWeekLearnedSections(cousreWeekFinishedNumOrDefault);
+            voList.add(learningPlanVO);
         }
         vo.setList(voList);
         vo.setPages(page.getPages());
         vo.setTotal(page.getTotal());
 
         return vo;
+    }
+
+    private Map<Long, CourseSimpleInfoDTO> getLongCourseSimpleInfoDTOMap(List<LearningLesson> records) {
+        Set<Long> courseIds = records.stream().map(LearningLesson::getCourseId).collect(Collectors.toSet());
+        List<CourseSimpleInfoDTO> cInfos = courseClient.getSimpleInfoList(courseIds);
+        if (CollUtils.isEmpty(cInfos)) {
+            throw new BizIllegalException("课程不存在");
+        }
+        // 将cInfos list转换为map <课程id ,CourseSimpleInfoDTO>
+        Map<Long, CourseSimpleInfoDTO> cInfoDTOMap = cInfos.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, c -> c));
+        return cInfoDTOMap;
     }
 }
 
