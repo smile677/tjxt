@@ -141,28 +141,27 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
             learningRecord.setUserId(userId);
             boolean result = this.save(learningRecord);
             if (!result) {
-                throw new DbException("新增考试记录失败");
+                throw new DbException("新增学习记录失败");
             }
             return false;
         }
         // 4.如果存在则更新学习记录 learning_record 更新 moment 字段
         // 是否第一次完成(旧状态为未完成 + 本次学习进度超过 50% 为学完)
-        assert oldLearningRecord != null;
         boolean isFinished = !oldLearningRecord.getFinished() && recordDTO.getMoment() * 2 >= recordDTO.getDuration();
         if (!isFinished) {
             LearningRecord learningRecord = new LearningRecord();
             learningRecord.setId(oldLearningRecord.getId());
-            learningRecord.setLessonId(oldLearningRecord.getLessonId());
-            learningRecord.setSectionId(oldLearningRecord.getSectionId());
+            learningRecord.setLessonId(recordDTO.getLessonId());
+            learningRecord.setSectionId(recordDTO.getSectionId());
             learningRecord.setMoment(recordDTO.getMoment());
-            learningRecord.setFinished(learningRecord.getFinished());
+            learningRecord.setFinished(isFinished);
             learningRecordDelayTaskHandler.addLearningRecordTask(learningRecord);
             return false;
         }
         boolean result = this.lambdaUpdate()
                 .set(LearningRecord::getMoment, recordDTO.getMoment())
-                .set(isFinished, LearningRecord::getFinished, true)
-                .set(isFinished, LearningRecord::getFinishTime, recordDTO.getCommitTime())
+                .set(LearningRecord::getFinished, true)
+                .set(LearningRecord::getFinishTime, recordDTO.getCommitTime())
                 .eq(LearningRecord::getId, oldLearningRecord.getId())
                 .update();
         if (!result) {
@@ -185,11 +184,13 @@ public class LearningRecordServiceImpl extends ServiceImpl<LearningRecordMapper,
         LearningRecord dbRecord = this.lambdaQuery()
                 .eq(LearningRecord::getLessonId, recordDTO.getLessonId())
                 .eq(LearningRecord::getSectionId, recordDTO.getSectionId())
+//                .eq(LearningRecord::getMoment, recordDTO.getMoment())
                 .one();
         if (dbRecord == null) {
             return null;
         }
         // 4.更新缓存
+        dbRecord.setMoment(recordDTO.getMoment());
         learningRecordDelayTaskHandler.writeRecordCache(dbRecord);
         return dbRecord;
     }

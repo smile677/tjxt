@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,23 +19,37 @@ import javax.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.DelayQueue;
+import java.util.concurrent.*;
 
+/**
+ * @author smile67
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class LearningRecordDelayTaskHandler {
-
-    private final StringRedisTemplate redisTemplate;
     private final DelayQueue<DelayTask<RecordTaskData>> queue = new DelayQueue<>();
-    private final static String RECORD_KEY_TEMPLATE = "learning:record:{}";
-    private final LearningRecordMapper recordMapper;
+    private static final String RECORD_KEY_TEMPLATE = "learning:record:{}";
+    private final StringRedisTemplate redisTemplate;
     private final ILearningLessonService lessonService;
+    private final LearningRecordMapper learningRecordMapper;
     private static volatile boolean begin = true;
+
+    // 建议1: 如果任务是属于CPU运算型任务， 推荐核心线程数为CPU的核数
+    // 建议2: 如果任务是属于IO型的任务，推荐核心线程数为CPU核数的2倍
+    static ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(
+            24,
+            25,
+            // 临时空闲线程存活时间
+            60,
+            TimeUnit.SECONDS,
+            // 延迟阻塞队列
+            new LinkedBlockingDeque<>(10));
+
 
     @PostConstruct // 项目启动后 当前类实例化 属性注入之后 方法会运行 一般用来做初始化工作
     public void init() {
+        log.debug("开启学习记录处理的延迟任务");
         CompletableFuture.runAsync(this::handleDelayTask);
     }
 
@@ -47,24 +62,21 @@ public class LearningRecordDelayTaskHandler {
     private void handleDelayTask() {
         while (begin) {
             try {
-                // 1.尝试获取任务
+                // 1. 尝试获取任务 // 从队列中拉去任务 take阻塞方法
                 DelayTask<RecordTaskData> task = queue.take();
                 RecordTaskData data = task.getData();
                 // 2.读取Redis缓存
                 LearningRecord learningRecord = readRecordCache(data.getLessonId(), data.getSectionId());
                 log.debug("获取到要处理的播放记录任务 任务数据{} 缓存中的数据{}", data, learningRecord);
-                if (learningRecord == null) {
-                    continue;
-                }
                 // 3.比较数据
-                if (!Objects.equals(data.getMoment(), learningRecord.getMoment())) {
+                if (!Objects.equals(learningRecord.getMoment(), data.getMoment())) {
                     // 4.如果不一致，播放进度在变化，无需持久化
                     continue;
                 }
                 // 5.如果一致，证明用户离开了视频，需要持久化
+//            learningRecord.setFinished(null);
                 // 5.1.更新学习记录
-                learningRecord.setFinished(null);
-                recordMapper.updateById(learningRecord);
+                learningRecordMapper.updateById(learningRecord);
                 // 5.2.更新课表
                 LearningLesson lesson = new LearningLesson();
                 lesson.setId(data.getLessonId());
@@ -73,7 +85,7 @@ public class LearningRecordDelayTaskHandler {
                 lessonService.updateById(lesson);
 
                 log.debug("准备持久化学习记录信息");
-            } catch (Exception e) {
+            } catch (InterruptedException e) {
                 log.error("处理播放记录任务发生异常", e);
             }
         }
