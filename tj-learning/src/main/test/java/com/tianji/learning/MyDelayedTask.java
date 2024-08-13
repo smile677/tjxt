@@ -62,7 +62,7 @@ public class MyDelayedTask implements Delayed {
         System.out.println("new Date() = " + new Date());
         while (queue.size() != 0) {
 //            MyDelayedTask delayedTask = queue.poll();// 从队列中拉取元素 poll非阻塞方法
-            MyDelayedTask delayedTask = queue.take();// 从队列中拉取元素 poll阻塞方法
+            MyDelayedTask delayedTask = queue.take();// 从队列中拉取元素 take阻塞方法
 //            while (delayedTask!=null){
             System.out.println(new Date() + "delayedTask = " + delayedTask);
 //            }
