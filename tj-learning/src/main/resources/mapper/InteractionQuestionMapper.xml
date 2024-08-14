@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.learning.mapper.InteractionQuestionMapper">
+
+    <resultMap id="BaseResultMap" type="com.tianji.learning.domain.po.InteractionQuestion">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="title" column="title" jdbcType="VARCHAR"/>
+            <result property="description" column="description" jdbcType="VARCHAR"/>
+            <result property="courseId" column="course_id" jdbcType="BIGINT"/>
+            <result property="chapterId" column="chapter_id" jdbcType="BIGINT"/>
+            <result property="sectionId" column="section_id" jdbcType="BIGINT"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="latestAnswerId" column="latest_answer_id" jdbcType="BIGINT"/>
+            <result property="answerTimes" column="answer_times" jdbcType="INTEGER"/>
+            <result property="anonymity" column="anonymity" jdbcType="BIT"/>
+            <result property="hidden" column="hidden" jdbcType="BIT"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,title,description,
+        course_id,chapter_id,section_id,
+        user_id,latest_answer_id,answer_times,
+        anonymity,hidden,status,
+        create_time,update_time
+    </sql>
+</mapper>
