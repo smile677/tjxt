@@ -49,6 +49,7 @@ public class LearningRecordDelayTaskHandler {
     @PostConstruct // 项目启动后 当前类实例化 属性注入之后 方法会运行 一般用来做初始化工作
     public void init() {
         log.debug("开启学习记录处理的延迟任务");
+        // 异步并发类 作用: 开启一个新线程执行任务
         CompletableFuture.runAsync(this::handleDelayTask);
     }
 
