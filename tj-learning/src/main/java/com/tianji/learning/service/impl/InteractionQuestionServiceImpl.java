@@ -171,4 +171,32 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         }
         return PageDTO.of(page, questionVOList);
     }
+
+    @Override
+    public QuestionVO queryQuesionById(Long id) {
+        // 1.校验
+        if (id == null) {
+            throw new BadRequestException("非法参数，问题id不能为空");
+        }
+        // 2.查询互动问题表 按照主键查询
+        InteractionQuestion interactionQuestion = this.getById(id);
+        if (interactionQuestion == null) {
+            throw new BadRequestException("问题不存在");
+        }
+        // 3.如果该问题管理员设置了隐藏字段 返回空
+        if (interactionQuestion.getHidden()) {
+            return null;
+        }
+        // 4.封装vo返回
+        QuestionVO questionVO = BeanUtils.copyBean(interactionQuestion, QuestionVO.class);
+        // 5.如果用户是匿名提问，则不显示用户名和头像 也就不再需要去查用户模块了
+        if (!interactionQuestion.getAnonymity()) {
+            UserDTO userDTO = userClient.queryUserById(interactionQuestion.getUserId());
+            if (userDTO != null) {
+                questionVO.setUserName(userDTO.getName());
+                questionVO.setUserIcon(userDTO.getIcon());
+            }
+        }
+        return questionVO;
+    }
 }
