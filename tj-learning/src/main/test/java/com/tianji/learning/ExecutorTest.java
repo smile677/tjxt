@@ -1,7 +1,5 @@
 package com.tianji.learning;
 
-import org.junit.jupiter.api.Test;
-
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;

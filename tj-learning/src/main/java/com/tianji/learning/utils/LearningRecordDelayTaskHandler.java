@@ -38,8 +38,8 @@ public class LearningRecordDelayTaskHandler {
     // 建议1: 如果任务是属于CPU运算型任务， 推荐核心线程数为CPU的核数
     // 建议2: 如果任务是属于IO型的任务，推荐核心线程数为CPU核数的2倍
     static ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(
-            12,
-            15,
+            24,
+            25,
             // 临时空闲线程存活时间
             60,
             TimeUnit.SECONDS,
