@@ -87,7 +87,7 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
                 // 排除字段：description 减少数据量
                 .select(InteractionQuestion.class, tableFieldInfo -> !Objects.equals(tableFieldInfo.getProperty(), "description"))
                 .eq(InteractionQuestion::getCourseId, query.getCourseId())
-                .eq(InteractionQuestion::getSectionId, query.getSectionId())
+                .eq(query.getSectionId() != null, InteractionQuestion::getSectionId, query.getSectionId())
                 .eq(query.getOnlyMine(), InteractionQuestion::getUserId, userId)
                 .eq(InteractionQuestion::getHidden, false)
                 .orderByDesc(InteractionQuestion::getCreateTime)
@@ -97,10 +97,13 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
             return PageDTO.empty(page.getTotal(), page.getPages());
         }
 
-        Set<Long> latestAnswerIds = new HashSet<>();// 互动问题的 最新回答id集合
-        Set<Long> userIds = new HashSet<>();// 互动问题的用户id集合
+        // 互动问题的 最新回答id集合
+        Set<Long> latestAnswerIds = new HashSet<>();
+        // 互动问题的用户id集合
+        Set<Long> userIds = new HashSet<>();
         for (InteractionQuestion interactionQuestion : interactionQuestionRecords) {
-            if (!interactionQuestion.getAnonymity()) { // 如果用户是匿名提问，则不显示用户名和头像
+            // 如果用户是匿名提问，则不显示用户名和头像 也就不再需要去查用户模块了
+            if (!interactionQuestion.getAnonymity()) {
                 userIds.add(interactionQuestion.getUserId());
             }
             if (interactionQuestion.getLatestAnswerId() != null) {
@@ -114,14 +117,17 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
 
         // 4.根据最新回答id 批量查询回答信息
         Map<Long, InteractionReply> replyMap = new HashMap<>();
+        // 虽然前面加入元素的时候已经判空，此处的判空是避免 latestAnswerIds Set整个集合为空
         if (CollUtils.isNotEmpty(latestAnswerIds)) {
 //            List<InteractionReply> interactionReplies = interactionReplyService.listByIds(latestAnswerIds);
             List<InteractionReply> interactionReplies = interactionReplyService.list(Wrappers.<InteractionReply>lambdaQuery()
                     .in(InteractionReply::getId, latestAnswerIds)
+                    // 管理员才能操作此字段
                     .eq(InteractionReply::getHidden, false));
             for (InteractionReply interactionReply : interactionReplies) {
                 if (!interactionReply.getAnonymity()) {
-                    userIds.add(interactionReply.getUserId());// 将最新回答的用户id 存入userIds
+                    // 将最新回答的用户id 存入userIds
+                    userIds.add(interactionReply.getUserId());
                 }
                 replyMap.put(interactionReply.getId(), interactionReply);
             }
@@ -140,7 +146,9 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
             if (!questionVO.getAnonymity()) {
                 UserDTO userDTO = userDTOMap.get(interactionQuestion.getUserId());
                 if (userDTO != null) {
+                    // 1.
                     questionVO.setUserName(userDTO.getName());
+                    // 2.
                     questionVO.setUserIcon(userDTO.getIcon());
                 }
             }
@@ -151,10 +159,12 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
                     UserDTO userDTO = userDTOMap.get(interactionReply.getUserId());
                     if (userDTO != null) {
                         // 最新回答的内容
+                        // 3.
                         questionVO.setLatestReplyUser(userDTO.getName());
                     }
                 }
                 // 最新回答者的昵称
+                // 4.
                 questionVO.setLatestReplyContent(interactionReply.getContent());
             }
             questionVOList.add(questionVO);
