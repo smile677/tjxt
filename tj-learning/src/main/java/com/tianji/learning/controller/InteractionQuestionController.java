@@ -1,6 +1,9 @@
 package com.tianji.learning.controller;
 
+import com.tianji.common.domain.dto.PageDTO;
 import com.tianji.learning.domain.dto.QuestionFormDTO;
+import com.tianji.learning.domain.query.QuestionPageQuery;
+import com.tianji.learning.domain.vo.QuestionVO;
 import com.tianji.learning.service.IInteractionQuestionService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -29,5 +32,11 @@ public class InteractionQuestionController {
     @PutMapping("/{id}")
     public void updateQuestion(@PathVariable("id") Long id, @RequestBody QuestionFormDTO dto) {
         questionService.updateQuestion(id, dto);
+    }
+
+    @ApiOperation("分页查询互动问题 - 用户端")
+    @GetMapping("/page")
+    public PageDTO<QuestionVO> queryQuestionPage(QuestionPageQuery query) {
+        return questionService.queryQuestionPage(query);
     }
 }

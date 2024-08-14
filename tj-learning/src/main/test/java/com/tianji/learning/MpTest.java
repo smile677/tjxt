@@ -4,13 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.metadata.OrderItem;
+import com.baomidou.mybatisplus.core.metadata.TableFieldInfo;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.tianji.common.domain.query.PageQuery;
+import com.tianji.learning.domain.po.InteractionQuestion;
 import com.tianji.learning.domain.po.LearningLesson;
 import com.tianji.learning.domain.po.LearningRecord;
 import com.tianji.learning.enums.LessonStatus;
 import com.tianji.learning.enums.PlanStatus;
 import com.tianji.learning.mapper.LearningRecordMapper;
+import com.tianji.learning.service.IInteractionQuestionService;
 import com.tianji.learning.service.ILearningLessonService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @SpringBootTest(classes = LearningApplication.class)// 测试用例所在的包和引导类所在的包不一样就会报错
@@ -172,5 +176,25 @@ public class MpTest {
         System.out.println("learningRecords = " + learningRecords);
         Map<Long, Long> cousreWeekFinishedNumMap = learningRecords.stream().collect(Collectors.toMap(LearningRecord::getLessonId, LearningRecord::getUserId));
         System.out.println("cousreWeekFinishedNumMap = " + cousreWeekFinishedNumMap);
+    }
+
+    @Autowired
+    private IInteractionQuestionService questionService;
+
+    @Test
+    public void test8() {
+        List<InteractionQuestion> description = questionService.lambdaQuery()
+                .select(InteractionQuestion.class, tableFieldInfo -> {
+                    // tableFieldInfo.getProperty():获取实体类的属性名称
+                    return !Objects.equals(tableFieldInfo.getProperty(), "description");// 制定不查字段
+                })
+                .eq(InteractionQuestion::getCourseId, "1549025085494521857")
+                .eq(InteractionQuestion::getUserId, 2)
+                .eq(InteractionQuestion::getHidden, false)
+                .orderByDesc(InteractionQuestion::getCreateTime)
+                .list();
+        for (InteractionQuestion interactionQuestion : description) {
+            System.out.println("interactionQuestion = " + interactionQuestion);
+        }
     }
 }
