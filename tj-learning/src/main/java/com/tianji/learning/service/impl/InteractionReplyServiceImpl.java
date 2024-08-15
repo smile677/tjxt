@@ -1,6 +1,7 @@
 package com.tianji.learning.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tianji.common.constants.MqConstants;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.UserContext;
 import com.tianji.learning.domain.dto.ReplyDTO;
@@ -12,6 +13,7 @@ import com.tianji.learning.service.IInteractionReplyService;
 import com.tianji.learning.mapper.InteractionReplyMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * @author smile67
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMapper, InteractionReply>
         implements IInteractionReplyService {
     private final InteractionQuestionMapper questionMapper;
+    private final InteractionQuestionServiceImpl questionService;
 
     @Override
     public void saveReply(ReplyDTO dto) {
@@ -52,6 +55,42 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
         }
         questionMapper.updateById(interactionQuestion);
     }
+    /*@Override
+    @Transactional
+    public void saveReply(ReplyDTO replyDTO) {
+        // 1.获取登录用户
+        Long userId = UserContext.getUser();
+        // 2.新增回答
+        InteractionReply reply = BeanUtils.toBean(replyDTO, InteractionReply.class);
+        reply.setUserId(userId);
+        save(reply);
+        // 3.累加评论数或者累加回答数
+        // 3.1.判断当前回复的类型是否是回答
+        boolean isAnswer = replyDTO.getAnswerId() == null;
+        if (!isAnswer) {
+            // 3.2.是评论，则需要更新上级回答的评论数量
+            lambdaUpdate()
+                    .setSql("reply_times = reply_times + 1")
+                    .eq(InteractionReply::getId, replyDTO.getAnswerId())
+                    .update();
+        }
+        // 3.3.尝试更新问题表中的状态、 最近一次回答、回答数量
+        questionService.lambdaUpdate()
+                .set(isAnswer, InteractionQuestion::getLatestAnswerId, reply.getAnswerId())
+                .setSql(isAnswer, "answer_times = answer_times + 1")
+                .set(replyDTO.getIsStudent(), InteractionQuestion::getStatus, QuestionStatus.UN_CHECK.getValue())
+                .eq(InteractionQuestion::getId, replyDTO.getQuestionId())
+                .update();
+
+//        // 4.尝试累加积分
+//        if(replyDTO.getIsStudent()) {
+//            // 学生才需要累加积分
+//            mqHelper.send(
+//                    MqConstants.Exchange.LEARNING_EXCHANGE,
+//                    MqConstants.Key.WRITE_REPLY,
+//                    5);
+//        }
+    }*/
 }
 
 
