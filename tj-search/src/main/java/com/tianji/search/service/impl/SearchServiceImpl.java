@@ -15,6 +15,7 @@ import com.tianji.search.domain.vo.CourseVO;
 import com.tianji.search.repository.CourseRepository;
 import com.tianji.search.service.IInterestsService;
 import com.tianji.search.service.ISearchService;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
@@ -39,22 +40,18 @@ import java.util.stream.Collectors;
 import static com.tianji.search.repository.CourseRepository.PUBLISH_TIME;
 
 @Service
+@RequiredArgsConstructor
 public class SearchServiceImpl implements ISearchService {
 
-    @Autowired
-    private RestHighLevelClient restClient;
+    private final RestHighLevelClient restClient;
 
-    @Autowired
-    private IInterestsService interestsService;
+    private final IInterestsService interestsService;
 
-    @Autowired
-    private UserClient userClient;
+    private final UserClient userClient;
 
-    @Autowired
-    private CategoryCache categoryCache;
+    private final CategoryCache categoryCache;
 
-    @Autowired
-    private InterestsProperties interestsProperties;
+    private final InterestsProperties interestsProperties;
 
     @Override
     public List<CourseVO> queryCourseByCateId(Long cateLv2Id) {
@@ -109,7 +106,7 @@ public class SearchServiceImpl implements ISearchService {
         SearchRequest request = new SearchRequest(CourseRepository.INDEX_NAME);
         BoolQueryBuilder queryBuilder = QueryBuilders.boolQuery();
         // 1.1.是否免费
-        if(isFree != null) {
+        if (isFree != null) {
             queryBuilder.filter(QueryBuilders.termQuery(CourseRepository.FREE, isFree));
         }
         // 1.2.分类id
@@ -120,7 +117,7 @@ public class SearchServiceImpl implements ISearchService {
                 queryBuilder.filter(QueryBuilders.termsQuery(CourseRepository.CATEGORY_ID_LV2, categoryIds));
             }
         }
-        if(isFree != null || categoryIds != null) {
+        if (isFree != null || categoryIds != null) {
             request.source().query(queryBuilder);
         }
         // 1.3.TopN
@@ -196,7 +193,9 @@ public class SearchServiceImpl implements ISearchService {
         SearchRequest request = new SearchRequest(CourseRepository.INDEX_NAME);
         // 2.构建DSL
         request.source()
+                //matchPhraseQuery搜索方法 也会分词
                 .query(QueryBuilders.matchPhraseQuery(CourseRepository.DEFAULT_QUERY_NAME, keyword))
+                //fetchSource 意思是从es中只取id字段
                 .fetchSource(new String[]{"id"}, null);
         // 3.查询
         SearchResponse response;
@@ -275,7 +274,7 @@ public class SearchServiceImpl implements ISearchService {
         }
         LocalDateTime beginTime = query.getBeginTime();
         LocalDateTime endTime = query.getEndTime();
-        if(beginTime != null || endTime != null) {
+        if (beginTime != null || endTime != null) {
             RangeQueryBuilder rangeQuery = QueryBuilders.rangeQuery(CourseRepository.UPDATE_TIME);
             if (beginTime != null) {
                 rangeQuery.gte(beginTime);

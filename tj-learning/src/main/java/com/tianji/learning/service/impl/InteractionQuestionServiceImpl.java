@@ -3,10 +3,17 @@ package com.tianji.learning.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tianji.api.cache.CategoryCache;
+import com.tianji.api.client.course.CatalogueClient;
+import com.tianji.api.client.course.CourseClient;
+import com.tianji.api.client.search.SearchClient;
 import com.tianji.api.client.user.UserClient;
+import com.tianji.api.dto.course.CataSimpleInfoDTO;
+import com.tianji.api.dto.course.CourseSimpleInfoDTO;
 import com.tianji.api.dto.user.UserDTO;
 import com.tianji.common.domain.dto.PageDTO;
 import com.tianji.common.exceptions.BadRequestException;
+import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.StringUtils;
@@ -14,7 +21,9 @@ import com.tianji.common.utils.UserContext;
 import com.tianji.learning.domain.dto.QuestionFormDTO;
 import com.tianji.learning.domain.po.InteractionQuestion;
 import com.tianji.learning.domain.po.InteractionReply;
+import com.tianji.learning.domain.query.QuestionAdminPageQuery;
 import com.tianji.learning.domain.query.QuestionPageQuery;
+import com.tianji.learning.domain.vo.QuestionAdminVO;
 import com.tianji.learning.domain.vo.QuestionVO;
 import com.tianji.learning.service.IInteractionQuestionService;
 import com.tianji.learning.mapper.InteractionQuestionMapper;
@@ -36,6 +45,10 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         implements IInteractionQuestionService {
     private final IInteractionReplyService interactionReplyService;
     private final UserClient userClient;
+    private final SearchClient searchClient;
+    private final CourseClient courseClient;
+    private final CatalogueClient catalogueClient;
+    private final CategoryCache categoryCache;
 
     @Override
     public void saveQuestion(QuestionFormDTO dto) {
@@ -198,5 +211,86 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
             }
         }
         return questionVO;
+    }
+
+    @Override
+    public PageDTO<QuestionAdminVO> queryQuestionAdminPage(QuestionAdminPageQuery query) {
+        // 0.如果用户传了课程的名称参数，则从es中获取该名称对应的课程id
+        String courseName = query.getCourseName();
+        List<Long> cids = null;
+        if (StringUtils.isNotBlank(courseName)) {
+            cids = searchClient.queryCoursesIdByName(courseName);
+            if (CollUtils.isEmpty(cids)) {
+                return PageDTO.empty(0L, 0L);
+            }
+        }
+        // 1.查询互动问题表 条件前端传了条件就添加 分页 排序 按照提问时间倒序排序
+        Page<InteractionQuestion> page = this.lambdaQuery()
+                .in(InteractionQuestion::getCourseId, cids)
+                .eq(query.getStatus() != null, InteractionQuestion::getStatus, query.getStatus())
+                .between(query.getBeginTime() != null && query.getEndTime() != null,
+                        InteractionQuestion::getCreateTime,
+                        query.getBeginTime(), query.getEndTime())
+                .page(query.toMpPageDefaultSortByCreateTimeDesc());
+        List<InteractionQuestion> records = page.getRecords();
+        if (CollUtils.isEmpty(records)) {
+            return PageDTO.empty(page);
+        }
+        // 用户id集合
+        Set<Long> uIds = new HashSet<>();
+        // 课程id集合
+        Set<Long> courseIds = new HashSet<>();
+        // 章和节id集合
+        Set<Long> chapterAndSectionIds = new HashSet<>();
+        for (InteractionQuestion interactionQuestion : records) {
+            uIds.add(interactionQuestion.getUserId());
+            courseIds.add(interactionQuestion.getCourseId());
+            chapterAndSectionIds.add(interactionQuestion.getChapterId());
+            chapterAndSectionIds.add(interactionQuestion.getSectionId());
+        }
+
+        // 2.远程调用用户服务 获取用户信息
+        List<UserDTO> userDTOS = userClient.queryUserByIds(uIds);
+        if (CollUtils.isEmpty(userDTOS)) {
+            throw new BizIllegalException("用户不存在");
+        }
+        Map<Long, UserDTO> userDTOMap = userDTOS.stream().collect(Collectors.toMap(UserDTO::getId, c -> c));
+
+        // 3.远程调用课程服务 获取课程信息
+        List<CourseSimpleInfoDTO> courseSimpleInfoDTOList = courseClient.getSimpleInfoList(courseIds);
+        if (CollUtils.isEmpty(courseSimpleInfoDTOList)) {
+            throw new BizIllegalException("课程不存在");
+        }
+        Map<Long, CourseSimpleInfoDTO> courseSimpleInfoDTOMap = courseSimpleInfoDTOList.stream().collect(Collectors.toMap(CourseSimpleInfoDTO::getId, c -> c));
+
+        // 4.远程调用课程服务 获取章节信息
+        List<CataSimpleInfoDTO> cataSimpleInfoDTOS = catalogueClient.batchQueryCatalogue(chapterAndSectionIds);
+        if (CollUtils.isEmpty(cataSimpleInfoDTOS)) {
+            throw new BizIllegalException("章节或者目录不存在");
+        }
+        Map<Long, String> cataInfoDTOMap = cataSimpleInfoDTOS.stream().collect(Collectors.toMap(CataSimpleInfoDTO::getId, c -> c.getName()));
+
+
+        // 6.封装vo放回
+        List<QuestionAdminVO> questionAdminVOList = new ArrayList<>();
+        for (InteractionQuestion interactionQuestion : records) {
+            QuestionAdminVO questionAdminVO = BeanUtils.copyBean(records, QuestionAdminVO.class);
+            UserDTO userDTO = userDTOMap.get(interactionQuestion.getUserId());
+            if (userDTO != null) {
+                questionAdminVO.setUserName(userDTO.getName());
+            }
+            CourseSimpleInfoDTO infoDTO = courseSimpleInfoDTOMap.get(interactionQuestion.getCourseId());
+            if (infoDTO != null) {
+                questionAdminVO.setCourseName(infoDTO.getName());
+                List<Long> categoryIds = infoDTO.getCategoryIds();
+                // 获取三级分类名称(数据量小+变动小：本地Caffeine缓存)
+                String categoryNames = categoryCache.getCategoryNames(categoryIds);
+                questionAdminVO.setCategoryName(categoryNames);
+            }
+            questionAdminVO.setChapterName(cataInfoDTOMap.get(interactionQuestion.getChapterId()));
+            questionAdminVO.setSectionName(cataInfoDTOMap.get(interactionQuestion.getSectionId()));
+            questionAdminVOList.add(questionAdminVO);
+        }
+        return PageDTO.of(page, questionAdminVOList);
     }
 }
