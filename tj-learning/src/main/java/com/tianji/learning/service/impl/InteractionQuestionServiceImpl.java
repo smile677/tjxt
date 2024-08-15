@@ -226,7 +226,7 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         }
         // 1.查询互动问题表 条件前端传了条件就添加 分页 排序 按照提问时间倒序排序
         Page<InteractionQuestion> page = this.lambdaQuery()
-                .in(InteractionQuestion::getCourseId, cids)
+                .in(cids != null, InteractionQuestion::getCourseId, cids)
                 .eq(query.getStatus() != null, InteractionQuestion::getStatus, query.getStatus())
                 .between(query.getBeginTime() != null && query.getEndTime() != null,
                         InteractionQuestion::getCreateTime,
@@ -274,7 +274,7 @@ public class InteractionQuestionServiceImpl extends ServiceImpl<InteractionQuest
         // 6.封装vo放回
         List<QuestionAdminVO> questionAdminVOList = new ArrayList<>();
         for (InteractionQuestion interactionQuestion : records) {
-            QuestionAdminVO questionAdminVO = BeanUtils.copyBean(records, QuestionAdminVO.class);
+            QuestionAdminVO questionAdminVO = BeanUtils.copyBean(interactionQuestion, QuestionAdminVO.class);
             UserDTO userDTO = userDTOMap.get(interactionQuestion.getUserId());
             if (userDTO != null) {
                 questionAdminVO.setUserName(userDTO.getName());
