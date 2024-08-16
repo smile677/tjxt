@@ -42,7 +42,7 @@ import static com.tianji.common.constants.Constant.DATA_FIELD_NAME_LIKED_TIME;
 public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMapper, InteractionReply>
         implements IInteractionReplyService {
     private final InteractionQuestionMapper questionMapper;
-    private final InteractionQuestionServiceImpl questionService;
+    // private final InteractionQuestionServiceImpl questionService;
     private final UserClient userClient;
 
     @Override
