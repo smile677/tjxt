@@ -46,6 +46,7 @@ public class InteractionReplyServiceImpl extends ServiceImpl<InteractionReplyMap
     private final UserClient userClient;
 
     @Override
+    @Transactional
     public void saveReply(ReplyDTO dto) {
         // 1.获取当前登录用户
         Long userId = UserContext.getUser();
