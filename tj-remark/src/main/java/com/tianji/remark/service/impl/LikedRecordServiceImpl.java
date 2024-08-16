@@ -6,7 +6,7 @@ import com.tianji.common.constants.MqConstants;
 import com.tianji.common.utils.StringUtils;
 import com.tianji.common.utils.UserContext;
 import com.tianji.remark.domain.dto.LikeRecordFormDTO;
-import com.tianji.remark.domain.dto.LikedTimesDTO;
+import com.tianji.api.dto.msg.LikedTimesDTO;
 import com.tianji.remark.domain.po.LikedRecord;
 import com.tianji.remark.service.ILikedRecordService;
 import com.tianji.remark.mapper.LikedRecordMapper;
