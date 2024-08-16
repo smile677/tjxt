@@ -6,10 +6,10 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Set;
 
 @Api(tags = "点赞相关接口")
 @RestController
@@ -23,4 +23,9 @@ public class LikedRecordController {
     public void addLikeRecord(@RequestBody @Validated LikeRecordFormDTO dto) {
         likedRecordService.addLikeRecord(dto);
     }
-}
+    @ApiOperation("批量查询点赞状态")
+    @GetMapping("/list")
+    public Set<Long> getLikesStatusByBizIds(@RequestParam("bizIds")List<Long> bizIds){
+        return likedRecordService.getLikesStatusByBizIds(bizIds);
+    }
+ }

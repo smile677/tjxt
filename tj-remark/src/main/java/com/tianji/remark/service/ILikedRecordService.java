@@ -4,6 +4,9 @@ import com.tianji.remark.domain.dto.LikeRecordFormDTO;
 import com.tianji.remark.domain.po.LikedRecord;
 import com.baomidou.mybatisplus.extension.service.IService;
 
+import java.util.List;
+import java.util.Set;
+
 /**
 * @author smile67
 * @description 针对表【liked_record(点赞记录表)】的数据库操作Service
@@ -12,4 +15,6 @@ import com.baomidou.mybatisplus.extension.service.IService;
 public interface ILikedRecordService extends IService<LikedRecord> {
 
     void addLikeRecord(LikeRecordFormDTO dto);
+
+    Set<Long> getLikesStatusByBizIds(List<Long> bizIds);
 }

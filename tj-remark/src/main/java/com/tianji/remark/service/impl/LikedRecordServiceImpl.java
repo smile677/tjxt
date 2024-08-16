@@ -14,6 +14,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 /**
  * @author smile67
  * @description 针对表【liked_record(点赞记录表)】的数据库操作Service实现
@@ -57,6 +61,19 @@ public class LikedRecordServiceImpl extends ServiceImpl<LikedRecordMapper, Liked
                 routeKey,
                 msg
         );
+    }
+
+    @Override
+    public Set<Long> getLikesStatusByBizIds(List<Long> bizIds) {
+        // 1.获取用户id
+        Long userId = UserContext.getUser();
+        // 2.查点赞记录表 in bizIds
+        List<LikedRecord> recordList = this.lambdaQuery()
+                .eq(LikedRecord::getUserId, userId)
+                .in(LikedRecord::getBizId, bizIds)
+                .list();
+        // 3.将查询到的bizIds转成集合返回
+        return recordList.stream().map(LikedRecord::getBizId).collect(Collectors.toSet());
     }
 
     // 取消点赞

@@ -6,12 +6,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * 配置feign的拦截器
+ */
 @Configuration
 @ConditionalOnClass(Feign.class)
 public class FeignRelayUserAutoConfiguration {
 
     @Bean
-    public FeignRelayUserInterceptor feignRelayUserInterceptor(){
+    public FeignRelayUserInterceptor feignRelayUserInterceptor() {
         return new FeignRelayUserInterceptor();
     }
 }
