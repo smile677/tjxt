@@ -1,4 +1,4 @@
-package com.tianji.remark.service.impl;
+package com.tianji.remark.constants;
 
 public interface RedisConstants {
  // 给业务点赞的用户集合的key前缀，后缀为业务id
