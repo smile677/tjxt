@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -58,7 +59,7 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
         // 拼接key
         String key = RedisConstants.LIKE_BIZ_KEY_PREFIX + dto.getBizId();
         Long totalLikesNum = redisTemplate.opsForSet().size(key);
-        if (totalLikesNum ==null) {
+        if (totalLikesNum == null) {
             return;
         }
         // 采用 zset 结构缓存点赞的总数 likes:times:type:QA likes:times:type:NOTE
@@ -84,12 +85,15 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
         // 1.获取用户id
         Long userId = UserContext.getUser();
         // 2.查点赞记录表 in bizIds
-        List<LikedRecord> recordList = this.lambdaQuery()
-                .eq(LikedRecord::getUserId, userId)
-                .in(LikedRecord::getBizId, bizIds)
-                .list();
+        Set<Long> likedBizIds = new HashSet<>();
+        for (Long bizId : bizIds) {
+            Boolean member = redisTemplate.opsForSet().isMember(RedisConstants.LIKE_BIZ_KEY_PREFIX + bizId, userId.toString());
+            if (member) {
+                likedBizIds.add(bizId);
+            }
+        }
         // 3.将查询到的bizIds转成集合返回
-        return recordList.stream().map(LikedRecord::getBizId).collect(Collectors.toSet());
+        return likedBizIds;
     }
 
     // 取消点赞
