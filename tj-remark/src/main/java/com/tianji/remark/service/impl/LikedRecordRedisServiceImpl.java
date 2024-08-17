@@ -62,22 +62,9 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
         if (totalLikesNum == null) {
             return;
         }
-        // 采用 zset 结构缓存点赞的总数 likes:times:type:QA likes:times:type:NOTE
+        // 4. 采用 zset 结构缓存点赞的总数 likes:times:type:QA likes:times:type:NOTE
         String bizTypeTotalLikeKey = RedisConstants.LIKE_COUNT_KEY_PREFIX + dto.getBizType();
-        Boolean add = redisTemplate.opsForZSet().add(bizTypeTotalLikeKey, dto.getBizId().toString(), totalLikesNum);
-        if (!add) {
-            log.debug("统计点赞总数失败");
-            return;
-        }
-        // 4.发生消息到mq
-        String routeKey = StringUtils.format(MqConstants.Key.LIKED_TIMES_KEY_TEMPLATE, dto.getBizType());
-        LikedTimesDTO msg = LikedTimesDTO.of(dto.getBizId(), totalLikesNum.intValue());
-        log.debug("发送的点赞消息：{}", msg);
-        rabbitMqHelper.send(
-                MqConstants.Exchange.LIKE_RECORD_EXCHANGE,
-                routeKey,
-                msg
-        );
+        redisTemplate.opsForZSet().add(bizTypeTotalLikeKey, dto.getBizId().toString(), totalLikesNum);
     }
 
     @Override
