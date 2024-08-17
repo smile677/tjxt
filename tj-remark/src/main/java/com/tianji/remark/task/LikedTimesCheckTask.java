@@ -25,7 +25,7 @@ public class LikedTimesCheckTask {
 
     // 每20s执行一次 将redis中 业务类型下面 某业务的点赞总数 发生消息给到mq
     //    @Scheduled(cron = "0/20 * * * * ?")// 每间隔20s执行一次
-    @Scheduled(fixedDelay = 20000)// 每间隔20s执行一次
+    @Scheduled(fixedDelay = 40000)// 每间隔20s执行一次  方法测试改成40s
     public void checkLikedTimes() {
         for (String bizType : BIZ_TYPES) {
             likedRecordService.readLikedTimesAndSendMessage(bizType, MAX_BIZ_SIZE);
