@@ -14,8 +14,10 @@ import com.tianji.remark.service.ILikedRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -81,6 +83,34 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
         }
         // 3.将查询到的bizIds转成集合返回
         return likedBizIds;
+    }
+
+    @Override
+    public void readLikedTimesAndSendMessage(String bizType, int maxBizSize) {
+        // 1.拼接key likes:times:type:QA likes:times:type:NOTE
+        String bizTypeTotalLikeKey = RedisConstants.LIKE_COUNT_KEY_PREFIX + bizType;
+        // 2.从redis的zset结构中 按照分数排序取maxBizSize的业务点赞信息 popmin
+        Set<ZSetOperations.TypedTuple<String>> typedTuples = redisTemplate.opsForZSet().popMin(bizTypeTotalLikeKey, maxBizSize);
+        // 3.封装LikedTimesDTO 消息数据
+        List<LikedTimesDTO> list = new ArrayList<>();
+        for (ZSetOperations.TypedTuple<String> typedTuple : typedTuples) {
+            String bizId = typedTuple.getValue();
+            Double likedTimes = typedTuple.getScore();
+            if (StringUtils.isBlank(bizId) || likedTimes == null) {
+                log.debug("bizId or likedTimes is null");
+            }
+            // 封装
+            LikedTimesDTO msg = LikedTimesDTO.of(Long.valueOf(bizId), likedTimes.intValue());
+            list.add(msg);
+        }
+        // 4.发送消息到mq
+        log.debug("批量发送点赞消息 消息内容:{}", list);
+        // "QA:times:changed"
+        String routingKey = StringUtils.format(MqConstants.Key.LIKED_TIMES_KEY_TEMPLATE, bizType);
+        rabbitMqHelper.send(
+                MqConstants.Exchange.LIKE_RECORD_EXCHANGE,
+                routingKey,
+                list);
     }
 
     // 取消点赞

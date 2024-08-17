@@ -13,6 +13,9 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Component
 @Slf4j
 @RequiredArgsConstructor
@@ -22,21 +25,24 @@ public class LikedRecordListener {
     /**
      * QA问答系统 消费者
      *
-     * @param dto
+     * @param list 点赞次数
      */
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(name = "qa.liked.times.queue", durable = "true"),
             exchange = @Exchange(name = MqConstants.Exchange.LIKE_RECORD_EXCHANGE, type = ExchangeTypes.TOPIC),
             key = MqConstants.Key.QA_LIKED_TIMES_KEY
     ))
-    public void onMsg(LikedTimesDTO dto) {
-        log.debug("LikedRecordListener 监听到消息{}", dto);
-        InteractionReply reply = interactionReplyService.getById(dto.getBizId());
-        if (reply == null) {
-            return;
+    public void onMsg(List<LikedTimesDTO> list) {
+        log.debug("LikedRecordListener 监听到消息{}", list);
+        // 消息转po
+        List<InteractionReply> replyList = new ArrayList<>();
+        for (LikedTimesDTO likedTimesDTO : list) {
+            InteractionReply interactionReply = new InteractionReply();
+            interactionReply.setId(likedTimesDTO.getBizId());
+            interactionReply.setLikedTimes(likedTimesDTO.getLikedTimes());
+            replyList.add(interactionReply);
         }
-        reply.setLikedTimes(dto.getLikedTimes());
-        interactionReplyService.updateById(reply);
+        interactionReplyService.saveOrUpdateBatch(replyList);
     }
 
 }
