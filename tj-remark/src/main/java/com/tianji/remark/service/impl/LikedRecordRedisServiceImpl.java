@@ -63,7 +63,7 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
             return;
         }
         // 采用 zset 结构缓存点赞的总数 likes:times:type:QA likes:times:type:NOTE
-        String bizTypeTotalLikeKey = RedisConstants.LIKE_COUNT_KEY_PREFIX + dto.getBizId();
+        String bizTypeTotalLikeKey = RedisConstants.LIKE_COUNT_KEY_PREFIX + dto.getBizType();
         Boolean add = redisTemplate.opsForZSet().add(bizTypeTotalLikeKey, dto.getBizId().toString(), totalLikesNum);
         if (!add) {
             log.debug("统计点赞总数失败");
