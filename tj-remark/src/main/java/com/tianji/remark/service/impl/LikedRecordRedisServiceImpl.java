@@ -13,6 +13,8 @@ import com.tianji.remark.mapper.LikedRecordMapper;
 import com.tianji.remark.service.ILikedRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.StringRedisConnection;
+import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * @author smile67
@@ -71,6 +74,31 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
 
     @Override
     public Set<Long> getLikesStatusByBizIds(List<Long> bizIds) {
+        // 1.获取登录用户id
+        Long userId = UserContext.getUser();
+        // 2.查询点赞状态
+        List<Object> objects = redisTemplate.executePipelined((RedisCallback<?>) connection -> {
+            StringRedisConnection src = (StringRedisConnection) connection;
+            for (Long bizId : bizIds) {
+                String key = RedisConstants.LIKE_COUNT_KEY_PREFIX + bizId;
+                src.sIsMember(key, userId.toString());
+            }
+            return null;
+        });
+        // 3.返回结果
+        return IntStream
+                // 创建从0到集合size的流
+                .range(0, objects.size())
+                //遍历每个元素,保留结果为true的角标i
+                .filter(i -> (Boolean) objects.get(i))
+                // 用角标i取bizIds中的对应数据, 就是点赞过的id
+                .mapToObj(bizIds::get)
+                // 收集
+                .collect(Collectors.toSet());
+
+    }
+    /*@Override
+    public Set<Long> getLikesStatusByBizIds(List<Long> bizIds) {
         // 1.获取用户id
         Long userId = UserContext.getUser();
         // 2.查点赞记录表 in bizIds
@@ -83,7 +111,7 @@ public class LikedRecordRedisServiceImpl extends ServiceImpl<LikedRecordMapper, 
         }
         // 3.将查询到的bizIds转成集合返回
         return likedBizIds;
-    }
+    }*/
 
     @Override
     public void readLikedTimesAndSendMessage(String bizType, int maxBizSize) {
