@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.io.Serializable;
 import java.util.Date;
+
+import com.tianji.learning.enums.PointsRecordType;
 import lombok.Data;
 
 /**
@@ -31,7 +33,7 @@ public class PointsRecord implements Serializable {
      * 积分方式：1-课程学习，2-每日签到，3-课程问答， 4-课程笔记，5-课程评价
      */
     @TableField(value = "type")
-    private Integer type;
+    private PointsRecordType type;
 
     /**
      * 积分值

@@ -2,8 +2,11 @@ package com.tianji.learning.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.DateUtils;
+import com.tianji.common.utils.UserContext;
 import com.tianji.learning.domain.po.PointsRecord;
+import com.tianji.learning.domain.vo.PointsStatisticsVO;
 import com.tianji.learning.enums.PointsRecordType;
 import com.tianji.learning.mq.msg.SignInMessage;
 import com.tianji.learning.service.IPointsRecordService;
@@ -12,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -62,9 +67,45 @@ public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, Poi
         // 4.保存积分
         PointsRecord pointsRecord = new PointsRecord();
         pointsRecord.setPoints(realPoints);
-        pointsRecord.setType(pointsRecordType.getValue());
+        pointsRecord.setType(pointsRecordType);
         pointsRecord.setUserId(msg.getUserId());
         this.save(pointsRecord);
+    }
+
+    @Override
+    public List<PointsStatisticsVO> queryMyTodayPoints() {
+        // 1.获取用户
+        Long userId = UserContext.getUser();
+
+        // 2.查询积分points_record
+        QueryWrapper<PointsRecord> wrapper = new QueryWrapper<>();
+        // SQL:select type,sum(points) from points_record
+        // where user_id=2
+        // and points_record.create_time between '2024-08-05 00:00:01' and '2024-08-19 23:59:59'
+        // group by type;
+        // 利用 userId 字段暂存数据
+        wrapper.select("type", "sum(points) as userId");
+        wrapper.eq("user_id", userId);
+        wrapper.between("create_time", DateUtils.getDayStartTime(LocalDateTime.now()), DateUtils.getDayEndTime(LocalDateTime.now()));
+        wrapper.groupBy("type");
+        List<PointsRecord> list = this.list(wrapper);
+        if (CollUtils.isEmpty(list)) {
+            return CollUtils.emptyList();
+        }
+
+        // 3.封装vo返回
+        List<PointsStatisticsVO> voList = new ArrayList<>();
+        for (PointsRecord pointsRecord : list) {
+            PointsStatisticsVO vo = new PointsStatisticsVO();
+            // 积分类型的中文
+            vo.setType(pointsRecord.getType().getDesc());
+            // 积分值
+            vo.setPoints(pointsRecord.getUserId().intValue());
+            // 积分类型的上限
+            vo.setMaxPoints(pointsRecord.getType().getMaxPoints());
+            voList.add(vo);
+        }
+        return voList;
     }
 }
 
