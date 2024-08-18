@@ -9,4 +9,5 @@ import com.baomidou.mybatisplus.extension.service.IService;
 * @createDate 2024-08-17 23:10:07
 */
 public interface IPointsBoardSeasonService extends IService<PointsBoardSeason> {
+    void createPointsBoardLastestTable(Integer id);
 }
