@@ -42,7 +42,7 @@ public class LearningPointsListener {
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(value = "qa.points.queue", durable = "true"),
             exchange = @Exchange(value = MqConstants.Exchange.LEARNING_EXCHANGE, type = ExchangeTypes.TOPIC),
-            key = MqConstants.Key.SIGN_IN
+            key = MqConstants.Key.QA_LIKED_TIMES_KEY
     ))
     public void listenReplyListener(SignInMessage msg) {
         log.debug("签到增加的积分 消费的消息 {}", msg);
