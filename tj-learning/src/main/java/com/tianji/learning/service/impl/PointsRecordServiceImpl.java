@@ -5,16 +5,21 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.DateUtils;
 import com.tianji.common.utils.UserContext;
+import com.tianji.learning.constants.RedisConstants;
 import com.tianji.learning.domain.po.PointsRecord;
 import com.tianji.learning.domain.vo.PointsStatisticsVO;
 import com.tianji.learning.enums.PointsRecordType;
 import com.tianji.learning.mq.msg.SignInMessage;
 import com.tianji.learning.service.IPointsRecordService;
 import com.tianji.learning.mapper.PointsRecordMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,9 +30,11 @@ import java.util.Map;
  * @createDate 2024-08-17 23:10:07
  */
 @Service
+@RequiredArgsConstructor
 public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, PointsRecord>
         implements IPointsRecordService {
 
+    private final StringRedisTemplate redisTemplate;
     @Override
     public void addPointRecord(SignInMessage msg, PointsRecordType pointsRecordType) {
         // 校验
@@ -70,6 +77,11 @@ public class PointsRecordServiceImpl extends ServiceImpl<PointsRecordMapper, Poi
         pointsRecord.setType(pointsRecordType);
         pointsRecord.setUserId(msg.getUserId());
         this.save(pointsRecord);
+        // 5.累加并保存积分值到Redis 采用zset 当前赛季的排行榜
+        LocalDate now = LocalDate.now();
+        String format = now.format(DateTimeFormatter.ofPattern("yyyyMM"));
+        String key = RedisConstants.POINTS_BOARD_KEY_PREFIX + format;
+        redisTemplate.opsForZSet().incrementScore(key, msg.getUserId().toString(), realPoints);
     }
 
     @Override
