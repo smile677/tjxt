@@ -1,11 +1,14 @@
 package com.tianji.learning.service.impl;
 
 
+import com.tianji.common.autoconfigure.mq.RabbitMqHelper;
+import com.tianji.common.constants.MqConstants;
 import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.UserContext;
 import com.tianji.learning.constants.RedisConstants;
 import com.tianji.learning.domain.vo.SignResultVO;
+import com.tianji.learning.mq.msg.SignInMessage;
 import com.tianji.learning.service.ISignRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +19,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -23,6 +28,7 @@ import java.util.List;
 @Slf4j
 public class SignRecordServiceImpl implements ISignRecordService {
     private final StringRedisTemplate redisTemplate;
+    private final RabbitMqHelper mqHelper;
 
     @Override
     public SignResultVO addSignRecords() {
@@ -59,7 +65,10 @@ public class SignRecordServiceImpl implements ISignRecordService {
                 break;
         }
 
-        // todo 6.保存积分
+        //  6.保存积分
+        mqHelper.send(MqConstants.Exchange.LEARNING_EXCHANGE,
+                MqConstants.Key.SIGN_IN,
+                SignInMessage.of(userId, rewardPoints + 1));
 
         // 7.返回结果
         SignResultVO signResultVO = new SignResultVO();
@@ -70,6 +79,40 @@ public class SignRecordServiceImpl implements ISignRecordService {
         // 连续签到奖励积分,连续签到7天以上才有奖励
         signResultVO.setRewardPoints(rewardPoints);
         return signResultVO;
+    }
+
+    @Override
+    public List<Long> getAllSignRecords() {
+        Long userId = UserContext.getUser();
+        LocalDate now = LocalDate.now();
+        String format = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = RedisConstants.SIGN_RECORD_KEY_PREFIX + userId.toString() + format;
+        List<Long> bitField = redisTemplate.opsForValue()
+                .bitField(key, BitFieldSubCommands
+                        .create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(now.getDayOfMonth()))
+                        .valueAt(0));
+        if (CollUtils.isEmpty(bitField)) {
+            return Collections.emptyList();
+        }
+        // 本月第一天到今天的签到数据 拿到的十进制数据
+        Long num = bitField.get(0);
+        log.debug("num  {}", num);
+        // 2.num转二进制
+        List<Long> binaryDigits = new ArrayList<>(now.getDayOfMonth() + 1);
+        // 先填充前导0
+        for (int i = 0; i < now.getDayOfMonth(); i++) {
+            binaryDigits.add(0L);
+        }
+        // 从最低有效位开始填充实际的二进制位
+        // 从最后一个位置开始
+        int index = now.getDayOfMonth() - 1;
+        while (num > 0 && index >= 0) {
+            binaryDigits.set(index--, num % 2);
+            // 右移一位
+            num >>= 1;
+        }
+        return binaryDigits;
     }
 
     /**
