@@ -35,7 +35,7 @@ public class PointsBoard implements Serializable {
     /**
      * 名次，只记录赛季前100
      */
-    @TableField(value = "rank")
+    @TableField(value = "`rank`")
     private Integer rank;
 
     /**

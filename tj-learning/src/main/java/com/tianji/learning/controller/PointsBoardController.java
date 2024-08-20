@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/boards")
 @RequiredArgsConstructor
-public class PointBoardController {
+public class PointsBoardController {
     private final IPointsBoardService pointsBoardService;
 
     @ApiOperation("查询学霸积分榜 - 当前赛季和历史赛季")
