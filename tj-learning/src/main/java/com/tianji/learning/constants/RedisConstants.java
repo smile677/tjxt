@@ -9,4 +9,8 @@ public interface RedisConstants {
      * 积分排行榜key前缀 完整格式为 boards:年月
      */
     String POINTS_BOARD_KEY_PREFIX = "boards:";
+    /**
+     * 动态表名前缀
+     */
+    String POINTS_BOARD_TABLE_PREFIX = "points_board_";
 }

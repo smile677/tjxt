@@ -93,7 +93,8 @@ public class PointsBoardServiceImpl extends ServiceImpl<PointsBoardMapper, Point
     }
 
     // 分页查询当前赛季列表  zset查 redis
-    private List<PointsBoard> queryCurrentBoard(String key, Integer pageNo, Integer pageSize) {
+    @Override
+    public List<PointsBoard> queryCurrentBoard(String key, Integer pageNo, Integer pageSize) {
         // 1.计算start和stop位置
         int start = (pageNo - 1) * pageSize;
         int end = start + pageSize - 1;
