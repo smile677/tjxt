@@ -7,7 +7,6 @@ import com.tianji.common.exceptions.BadRequestException;
 import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
-import com.tianji.common.utils.DateUtils;
 import com.tianji.common.utils.StringUtils;
 import com.tianji.promotion.domain.dto.CouponFormDTO;
 import com.tianji.promotion.domain.dto.CouponIssueFormDTO;
@@ -16,19 +15,17 @@ import com.tianji.promotion.domain.po.CouponScope;
 import com.tianji.promotion.domain.query.CouponQuery;
 import com.tianji.promotion.domain.vo.CouponPageVO;
 import com.tianji.promotion.enums.CouponStatus;
+import com.tianji.promotion.enums.ObtainType;
 import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.ICouponService;
 import com.tianji.promotion.mapper.CouponMapper;
-import io.swagger.annotations.ApiModel;
-import io.swagger.annotations.ApiModelProperty;
-import lombok.Data;
+import com.tianji.promotion.service.IExchangeCodeService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.validation.constraints.Future;
-import javax.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +40,7 @@ import java.util.List;
 public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
         implements ICouponService {
     private final ICouponScopeService couponScopeService;
+    private final IExchangeCodeService exchangeCodeService;
 
     @Override
     @Transactional
@@ -125,14 +123,22 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
             coupon.setStatus(CouponStatus.UN_ISSUE);
         }*/
         // 方式二：
-        Coupon couponDB = BeanUtils.copyBean(dto, Coupon.class);
+        Coupon temp = BeanUtils.copyBean(dto, Coupon.class);
         if (isBeginIssue) {
-            couponDB.setStatus(CouponStatus.ISSUING);
-            couponDB.setIssueBeginTime(dto.getIssueBeginTime() == null ? now : dto.getIssueBeginTime());
+            temp.setStatus(CouponStatus.ISSUING);
+            temp.setIssueBeginTime(dto.getIssueBeginTime() == null ? now : dto.getIssueBeginTime());
         } else {
-            couponDB.setStatus(CouponStatus.UN_ISSUE);
+            temp.setStatus(CouponStatus.UN_ISSUE);
         }
-        this.updateById(couponDB);
+        this.updateById(temp);
+
+        // 5.如果优惠券的 领取方式为 制定发送 且 优惠券之前的状态是待发放，需要生成兑换码
+        if (coupon.getObtainWay() == ObtainType.ISSUE && coupon.getStatus() == CouponStatus.DRAFT) {
+            // 兑换码的兑换的截止时间，就是优惠券领取的截止时间；该时间是从前端传的
+            coupon.setIssueEndTime(dto.getIssueEndTime());
+            // 异步生成兑换码
+            exchangeCodeService.asyncGenerateExchangeCode(coupon);
+        }
     }
 }
 
