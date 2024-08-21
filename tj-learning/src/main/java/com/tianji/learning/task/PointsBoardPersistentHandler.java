@@ -11,6 +11,7 @@ import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ import java.util.List;
 public class PointsBoardPersistentHandler {
     private final IPointsBoardSeasonService pointsBoardSeasonService;
     private final IPointsBoardService pointsBoardService;
+    private final StringRedisTemplate redisTemplate;
 
     /**
      * 创建上赛季（上个月）榜单表
@@ -93,8 +95,20 @@ public class PointsBoardPersistentHandler {
                 pointsBoard.setRank(null);
             }
             pointsBoardService.saveBatch(pointsBoardList);
+            // 方案二：7.删除redis本页数据
         }
         // 6.清空threadlocal中的数据
         TableInfoContext.remove();
+    }
+
+    // 方案一：需要设置 持久化任务 与 删除Redis任务 两任务之间的时间间隔 避免一个分片执行完后就把所有redis中的数据都给删了
+    @XxlJob("clearPointsBoardFromRedis")
+    public void clearPointsBoardFromRedis() {
+        // 1.获取上个月的时间
+        LocalDate localDateOfLastMonth = LocalDate.now().minusMonths(1);
+        // 2.计算key
+        String key = RedisConstants.POINTS_BOARD_KEY_PREFIX + localDateOfLastMonth.format(DateTimeFormatter.ofPattern("yyyyMM"));
+        // 3.删除
+        redisTemplate.unlink(key);
     }
 }
