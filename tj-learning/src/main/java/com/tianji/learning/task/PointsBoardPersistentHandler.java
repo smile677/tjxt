@@ -1,6 +1,5 @@
 package com.tianji.learning.task;
 
-import com.tianji.api.client.course.CourseClient;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.learning.constants.RedisConstants;
 import com.tianji.learning.domain.po.PointsBoard;
@@ -8,6 +7,7 @@ import com.tianji.learning.domain.po.PointsBoardSeason;
 import com.tianji.learning.service.IPointsBoardSeasonService;
 import com.tianji.learning.service.IPointsBoardService;
 import com.tianji.learning.utils.TableInfoContext;
+import com.xxl.job.core.context.XxlJobHelper;
 import com.xxl.job.core.handler.annotation.XxlJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,14 +74,19 @@ public class PointsBoardPersistentHandler {
         String format = localDateOfLastMonth.format(DateTimeFormatter.ofPattern("yyyyMM"));
         // boards:202408
         String key = RedisConstants.POINTS_BOARD_KEY_PREFIX + format;
-        int pageNo = 1;
-        int PageSize = 100;
+        // 当前实例的分片索引，是从0开始的
+        int shardIndex = XxlJobHelper.getShardIndex();
+        // 分片总实例
+        int shardTotal = XxlJobHelper.getShardTotal();
+        int pageNo = 1 + shardIndex;
+        int pageSize = 5;
         while (true) {
-            List<PointsBoard> pointsBoardList = pointsBoardService.queryCurrentBoard(key, pageNo, PageSize);
+            log.debug("处理第{}页数据", pageNo);
+            List<PointsBoard> pointsBoardList = pointsBoardService.queryCurrentBoard(key, pageNo, pageSize);
             if (CollUtils.isEmpty(pointsBoardList)) {
                 break;// 跳出循环 进行下一步
             }
-            pageNo++;
+            pageNo += shardTotal;
             // 5.持久化到db相应的赛季表中
             for (PointsBoard pointsBoard : pointsBoardList) {
                 pointsBoard.setId(Long.valueOf(pointsBoard.getRank()));
