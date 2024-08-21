@@ -10,6 +10,7 @@ import com.tianji.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -30,7 +31,9 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
     private final StringRedisTemplate redisTemplate;
 
     @Override
+    @Async("generateExchangeCodeExecutor")// 使用generateExchangeCodeExecutor自定义的线程池中的线程异步执行
     public void asyncGenerateExchangeCode(Coupon coupon) {
+        log.debug("生成兑换码 线程名：" + Thread.currentThread().getName());
         Integer totalNum = coupon.getTotalNum();
         // 方式1：循环兑换 循环中单个获取自增id   incr（效率不高）
         // 方式2：先调用incrby 得到自增id最大值，然后在循环生成兑换码（只需要操作一次redis即可）

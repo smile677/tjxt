@@ -88,6 +88,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
 
     @Override
     public void issueCoupon(Long id, CouponIssueFormDTO dto) {
+        log.debug("发放优惠券 线程名："+Thread.currentThread().getName());
         // 1.校验
         if (id == null || !id.equals(dto.getId())) {
             throw new BadRequestException("非法参数");
