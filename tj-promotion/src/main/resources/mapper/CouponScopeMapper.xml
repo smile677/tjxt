@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.promotion.mapper.CouponScopeMapper">
+
+    <resultMap id="BaseResultMap" type="com.tianji.promotion.domain.po.CouponScope">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="type" column="type" jdbcType="TINYINT"/>
+            <result property="couponId" column="coupon_id" jdbcType="BIGINT"/>
+            <result property="bizId" column="biz_id" jdbcType="BIGINT"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,type,coupon_id,
+        biz_id
+    </sql>
+</mapper>
