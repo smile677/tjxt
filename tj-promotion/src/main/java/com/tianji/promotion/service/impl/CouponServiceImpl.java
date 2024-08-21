@@ -193,7 +193,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
             CouponVO vo = BeanUtils.copyBean(c, CouponVO.class);
             // 优惠券还有剩余 （issue_num < total_num）且（统计的用户券表user_coupon取出当前用户已经领取数量<user_limit）
             Long issNum = issueMap.getOrDefault(c.getId(), 0L);
-            boolean available = issNum < c.getTotalNum() && issNum < c.getUserLimit();
+            boolean available = c.getIssueNum() < c.getTotalNum() && issNum < c.getUserLimit();
             // 是否可以领取
             vo.setAvailable(available);
             // 统计的用户券表user_coupon取出当前用户已经领取数量且未使用的卷数量
