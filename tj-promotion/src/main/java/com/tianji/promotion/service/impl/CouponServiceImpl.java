@@ -8,27 +8,31 @@ import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.StringUtils;
+import com.tianji.common.utils.UserContext;
 import com.tianji.promotion.domain.dto.CouponFormDTO;
 import com.tianji.promotion.domain.dto.CouponIssueFormDTO;
 import com.tianji.promotion.domain.po.Coupon;
 import com.tianji.promotion.domain.po.CouponScope;
 import com.tianji.promotion.domain.query.CouponQuery;
 import com.tianji.promotion.domain.vo.CouponPageVO;
+import com.tianji.promotion.domain.vo.CouponVO;
 import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.enums.ObtainType;
+import com.tianji.promotion.enums.UserCouponStatus;
 import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.ICouponService;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.service.IExchangeCodeService;
-
+import com.tianji.promotion.service.IUserCouponService;
+import com.tianji.promotion.domain.po.UserCoupon;
 import lombok.RequiredArgsConstructor;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author smile67
@@ -41,6 +45,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
         implements ICouponService {
     private final ICouponScopeService couponScopeService;
     private final IExchangeCodeService exchangeCodeService;
+    private final IUserCouponService userCouponService;
 
     @Override
     @Transactional
@@ -88,7 +93,7 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
 
     @Override
     public void issueCoupon(Long id, CouponIssueFormDTO dto) {
-        log.debug("发放优惠券 线程名："+Thread.currentThread().getName());
+        log.debug("发放优惠券 线程名：" + Thread.currentThread().getName());
         // 1.校验
         if (id == null || !id.equals(dto.getId())) {
             throw new BadRequestException("非法参数");
@@ -140,6 +145,65 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
             // 异步生成兑换码
             exchangeCodeService.asyncGenerateExchangeCode(coupon);
         }
+    }
+
+    @Override
+    public List<CouponVO> queryIssuingCoupons() {
+        // 1.查询db coupon 条件：发放中 手动领取
+        List<Coupon> couponList = this.lambdaQuery()
+                .eq(Coupon::getStatus, CouponStatus.ISSUING)
+                .eq(Coupon::getObtainWay, ObtainType.PUBLIC)
+                .list();
+        if (CollUtils.isEmpty(couponList)) {
+            return CollUtils.emptyList();
+        }
+
+        // 2.查询用户券user_coupon 条件：当前用户 发放中的优惠券id
+        Set<Long> couponIds = couponList.stream().map(Coupon::getId).collect(Collectors.toSet());
+        List<UserCoupon> list = userCouponService.lambdaQuery()
+                .eq(UserCoupon::getUserId, UserContext.getUser())
+                .in(UserCoupon::getCouponId, couponIds)
+                .list();
+
+        // 2.1 统计当前用户 针对每一个券 的已领取数量
+        // 常规
+        /*Map<Long, Long> issueMap = new HashMap<>();
+        // 键：优惠券id 值：已领数量
+        // 101 2
+        // 102 1
+        for (UserCoupon userCoupon : list) {
+            // 优惠券领取数量
+            Long num = issueMap.get(userCoupon.getCouponId());
+            if (num == null) {
+                issueMap.put(userCoupon.getCouponId(), 1L);
+            } else {
+                issueMap.put(userCoupon.getCouponId(), num + 1);
+            }
+        }*/
+        // stream
+        Map<Long, Long> issueMap = list.stream()
+                .collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
+        // 2.2 统计当前用户 针对每一个卷 的已领且未使用的数量
+        Map<Long, Long> unuseMap = list.stream()
+                .filter(c -> c.getStatus() == UserCouponStatus.UNUSED)
+                .collect(Collectors.groupingBy(UserCoupon::getCouponId, Collectors.counting()));
+        // 3.po转vo
+        List<CouponVO> voList = new ArrayList<>();
+        for (Coupon c : couponList) {
+            CouponVO vo = BeanUtils.copyBean(c, CouponVO.class);
+            // 优惠券还有剩余 （issue_num < total_num）且（统计的用户券表user_coupon取出当前用户已经领取数量<user_limit）
+            Long issNum = issueMap.getOrDefault(c.getId(), 0L);
+            boolean available = issNum < c.getTotalNum() && issNum < c.getUserLimit();
+            // 是否可以领取
+            vo.setAvailable(available);
+            // 统计的用户券表user_coupon取出当前用户已经领取数量且未使用的卷数量
+            boolean receive = unuseMap.getOrDefault(c.getId(), 0L) > 0;
+            // 是否可以使用
+            vo.setReceived(receive);
+            voList.add(vo);
+        }
+
+        return voList;
     }
 }
 
