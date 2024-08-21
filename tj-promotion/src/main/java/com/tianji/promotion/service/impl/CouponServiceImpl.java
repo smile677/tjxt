@@ -4,21 +4,32 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tianji.common.domain.dto.PageDTO;
 import com.tianji.common.exceptions.BadRequestException;
+import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
 import com.tianji.common.utils.CollUtils;
+import com.tianji.common.utils.DateUtils;
 import com.tianji.common.utils.StringUtils;
 import com.tianji.promotion.domain.dto.CouponFormDTO;
+import com.tianji.promotion.domain.dto.CouponIssueFormDTO;
 import com.tianji.promotion.domain.po.Coupon;
 import com.tianji.promotion.domain.po.CouponScope;
 import com.tianji.promotion.domain.query.CouponQuery;
 import com.tianji.promotion.domain.vo.CouponPageVO;
+import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.ICouponService;
 import com.tianji.promotion.mapper.CouponMapper;
+import io.swagger.annotations.ApiModel;
+import io.swagger.annotations.ApiModelProperty;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.validation.constraints.Future;
+import javax.validation.constraints.NotNull;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -70,11 +81,58 @@ public class CouponServiceImpl extends ServiceImpl<CouponMapper, Coupon>
                 .like(StringUtils.isNotBlank(query.getName()), Coupon::getName, query.getName())
                 .page(query.toMpPageDefaultSortByCreateTimeDesc());
         List<Coupon> records = page.getRecords();
-        if (CollUtils.isEmpty(records)){
+        if (CollUtils.isEmpty(records)) {
             return PageDTO.empty(page.getTotal(), page.getPages());
         }
         // 2.封装vo
-        return PageDTO.of(page,BeanUtils.copyList(records, CouponPageVO.class));
+        return PageDTO.of(page, BeanUtils.copyList(records, CouponPageVO.class));
+    }
+
+    @Override
+    public void issueCoupon(Long id, CouponIssueFormDTO dto) {
+        // 1.校验
+        if (id == null || !id.equals(dto.getId())) {
+            throw new BadRequestException("非法参数");
+        }
+        // 2.校验优惠券id是否存在
+        Coupon coupon = this.getById(id);
+        if (coupon == null) {
+            throw new BadRequestException("优惠券不存在");
+        }
+        // 3.校验优惠券状态 只有待发放和暂停状态的才能发
+        if (coupon.getStatus() != CouponStatus.DRAFT && coupon.getStatus() != CouponStatus.UN_ISSUE) {
+            throw new BizIllegalException("优惠券状态不正确,只有待发放和暂停中的优惠券才能发放");
+        }
+        // 优惠券是否是立刻发放
+        LocalDateTime now = LocalDateTime.now();
+        boolean isBeginIssue = dto.getIssueBeginTime() == null || !dto.getIssueBeginTime().isAfter(now);
+        // 4.修改优惠券的 领取时间和结束时间 使用有效期开始时间和介绍时间 天数 状态
+        // 方式一：
+        /*if (isBeginIssue) {
+            coupon.setIssueBeginTime(dto.getIssueBeginTime() == null ? now : dto.getIssueBeginTime());
+            coupon.setIssueEndTime(dto.getIssueBeginTime());
+            coupon.setTermDays(dto.getTermDays());
+            coupon.setTermBeginTime(dto.getTermBeginTime());
+            coupon.setTermEndTime(dto.getTermEndTime());
+            // 立刻发放 优惠券状态修改为进行中
+            coupon.setStatus(CouponStatus.ISSUING);
+        } else {
+            coupon.setIssueBeginTime(dto.getIssueBeginTime());
+            coupon.setIssueEndTime(dto.getIssueEndTime());
+            coupon.setTermDays(dto.getTermDays());
+            coupon.setTermBeginTime(dto.getTermBeginTime());
+            coupon.setTermEndTime(dto.getTermEndTime());
+            coupon.setStatus(CouponStatus.UN_ISSUE);
+        }*/
+        // 方式二：
+        Coupon couponDB = BeanUtils.copyBean(dto, Coupon.class);
+        if (isBeginIssue) {
+            couponDB.setStatus(CouponStatus.ISSUING);
+            couponDB.setIssueBeginTime(dto.getIssueBeginTime() == null ? now : dto.getIssueBeginTime());
+        } else {
+            couponDB.setStatus(CouponStatus.UN_ISSUE);
+        }
+        this.updateById(couponDB);
     }
 }
 
