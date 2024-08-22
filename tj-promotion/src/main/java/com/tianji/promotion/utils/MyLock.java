@@ -1,5 +1,7 @@
 package com.tianji.promotion.utils;
 
+import com.tianji.promotion.enums.MyLockType;
+
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -19,4 +21,10 @@ public @interface MyLock {
     long leaseTime() default -1;
 
     TimeUnit unit() default TimeUnit.SECONDS;
+
+    /**
+     * 代表锁类型 默认可重入
+     * @return
+     */
+    MyLockType lockType() default MyLockType.RE_ENTRANT_LOCK;
 }

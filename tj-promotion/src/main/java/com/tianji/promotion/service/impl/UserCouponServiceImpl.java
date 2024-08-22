@@ -10,25 +10,22 @@ import com.tianji.promotion.domain.po.ExchangeCode;
 import com.tianji.promotion.domain.po.UserCoupon;
 import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.enums.ExchangeCodeStatus;
+import com.tianji.promotion.enums.MyLockType;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.IExchangeCodeService;
 import com.tianji.promotion.service.IUserCouponService;
 import com.tianji.promotion.utils.CodeUtil;
 import com.tianji.promotion.utils.MyLock;
-import com.tianji.promotion.utils.RedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author smile67
@@ -128,10 +125,9 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     }
 
-    @MyLock(name = "lock:coupon:uid")
+    @MyLock(name = "lock:coupon:uid", lockType = MyLockType.RE_ENTRANT_LOCK)
     @Transactional
     @Override
-
     public void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
         // Long类型 -128~127 之间是同一个对象 享元模式 超过该区间是不同的对象
         // Long.toString 方法底层是new String 所以还是不同的对象
