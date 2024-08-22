@@ -171,6 +171,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                     .update();
         }
 //        }
+        throw new RuntimeException("故意报错");
     }
 
     // 保存用户券
