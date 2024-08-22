@@ -126,7 +126,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     }
 
-    @MyLock(name = "lock:coupon:uid",
+    @MyLock(name = "lock:coupon:uid:#{userId}",
             lockType = MyLockType.RE_ENTRANT_LOCK,
             lockStrategy = MyLockStrategy.FAIL_AFTER_RETRY_TIMEOUT)
     @Transactional
