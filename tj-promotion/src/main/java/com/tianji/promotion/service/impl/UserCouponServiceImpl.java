@@ -18,6 +18,7 @@ import com.tianji.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -29,12 +30,13 @@ import java.time.LocalDateTime;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon>
-        implements IUserCouponService {
+public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon> implements IUserCouponService {
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
 
+    // 领取优惠券
     @Override
+    @Transactional
     public void receiveCoupon(Long id) {
         // 1.根据id查询优惠券信息 做相关校验
         if (id == null) {
@@ -115,30 +117,57 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         }
     }
 
-    private void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum
-    ) {
-        // 1.获取当前用户 对该优惠券 已领数量 user_coupon 判断是否超出限领数量
-        Integer count = this.lambdaQuery()
-                .eq(UserCoupon::getUserId, userId)
-                .eq(UserCoupon::getCouponId, coupon.getId())
-                .count();
-        if (count != null && count >= coupon.getUserLimit()) {
-            throw new BizIllegalException("该优惠券领取次数已达到上限");
-        }
-        // 2.优惠券的已发数量+1
+    public static void main(String[] args) {
+        Long l1 = 1L;
+        Long l2 = 1L;
+        System.out.println("l1 == l2 = " + (l1 == l2));
+        Long l3 = -129L;
+        Long l4 = -129L;
+        // -128 ~ 127
+        System.out.println("l3 == l4 = " + (l3 == l4));
+        Long l5 = 129L;
+        Long l6 = 129L;
+        // -128 ~ 127
+        System.out.println("l3 == l4 = " + (l5 == l6));
+
+        String s1 = new String("abc");
+        String s2 = new String("abc");
+        System.out.println("(s1 == s2) = " + (s1 == s2));
+
+        String s3 = new String("cdf").intern();
+        String s4 = new String("cdf").intern();
+        System.out.println("(s3 == s4) = " + (s3 == s4));
+
+        String s5 = new String("gh");
+        String s6 = new String("gh").intern();
+        System.out.println(" (s5 == s6) = " + (s5 == s6));
+    }
+
+    private void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
+        // Long类型 -128~127 之间是同一个对象 享元模式 超过该区间是不同的对象
+        // Long.toString 方法底层是new String 所以还是不同的对象
+        // Long.toString.intern() inter方法是强制从常量池中取出字符串
+        synchronized (userId.toString().intern()) {
+            // 1.获取当前用户 对该优惠券 已领数量 user_coupon 判断是否超出限领数量
+            Integer count = this.lambdaQuery().eq(UserCoupon::getUserId, userId).eq(UserCoupon::getCouponId, coupon.getId()).count();
+            if (count != null && count >= coupon.getUserLimit()) {
+                throw new BizIllegalException("该优惠券领取次数已达到上限");
+            }
+            // 2.优惠券的已发数量+1
 //        coupon.setIssueNum(coupon.getIssueNum() + 1);
 //        couponMapper.updateById(coupon);
-        // 使用这种方式，考虑后面的并发控制
-        couponMapper.incrIssueNum(coupon.getId());
-        // 3.生成用户券
-        saveUserCoupon(userId, coupon);
-        // 4.更新兑换码状态
-        if (serialNum != null) {
-            exchangeCodeService.lambdaUpdate()
-                    .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
-                    .set(ExchangeCode::getUserId, userId)
-                    .eq(ExchangeCode::getId, serialNum)
-                    .update();
+            // 使用这种方式，考虑后面的并发控制
+            couponMapper.incrIssueNum(coupon.getId());
+            // 3.生成用户券
+            saveUserCoupon(userId, coupon);
+            // 4.更新兑换码状态
+            if (serialNum != null) {
+                exchangeCodeService.lambdaUpdate()
+                        .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
+                        .set(ExchangeCode::getUserId, userId)
+                        .eq(ExchangeCode::getId, serialNum)
+                        .update();
+            }
         }
     }
 
