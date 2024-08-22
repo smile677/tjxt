@@ -10,6 +10,7 @@ import com.tianji.promotion.domain.po.ExchangeCode;
 import com.tianji.promotion.domain.po.UserCoupon;
 import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.enums.ExchangeCodeStatus;
+import com.tianji.promotion.utils.MyLockStrategy;
 import com.tianji.promotion.utils.MyLockType;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.mapper.UserCouponMapper;
@@ -125,7 +126,9 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
     }
 
-    @MyLock(name = "lock:coupon:uid", lockType = MyLockType.RE_ENTRANT_LOCK)
+    @MyLock(name = "lock:coupon:uid",
+            lockType = MyLockType.RE_ENTRANT_LOCK,
+            lockStrategy = MyLockStrategy.FAIL_AFTER_RETRY_TIMEOUT)
     @Transactional
     @Override
     public void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
