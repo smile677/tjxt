@@ -17,6 +17,7 @@ import com.tianji.promotion.service.IUserCouponService;
 import com.tianji.promotion.utils.CodeUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,7 +76,12 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         saveUserCoupon(userId, coupon);*/
         // 提取函数为
         synchronized (userId.toString().intern()) {
-            checkAndCreateUserCoupon(userId, coupon, null);
+            // 从aop上下文中 获取当前类的代理对象
+            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+            // 这种写法是调用原对象
+//            checkAndCreateUserCoupon(userId, coupon, null);
+            // 调用代理对象的的方法，这种方法有事务处理
+            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
         }
     }
 
@@ -145,6 +151,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     }
 
     @Transactional
+    @Override
     public void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
         // Long类型 -128~127 之间是同一个对象 享元模式 超过该区间是不同的对象
         // Long.toString 方法底层是new String 所以还是不同的对象
