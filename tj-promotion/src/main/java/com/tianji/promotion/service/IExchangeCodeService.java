@@ -12,4 +12,6 @@ import com.baomidou.mybatisplus.extension.service.IService;
 public interface IExchangeCodeService extends IService<ExchangeCode> {
     // 异步生成兑换码
     void asyncGenerateExchangeCode(Coupon coupon);
+
+    boolean updateExchangeCodeMark(long serialNum, boolean flag);
 }

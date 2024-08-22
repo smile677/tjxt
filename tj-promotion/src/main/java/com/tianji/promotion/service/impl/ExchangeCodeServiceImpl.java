@@ -1,6 +1,7 @@
 package com.tianji.promotion.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.promotion.constants.PromotionConstants;
 import com.tianji.promotion.domain.po.Coupon;
 import com.tianji.promotion.domain.po.ExchangeCode;
@@ -59,6 +60,14 @@ public class ExchangeCodeServiceImpl extends ServiceImpl<ExchangeCodeMapper, Exc
         this.saveBatch(exchangeCodeList);
         // 4.写入缓存 member:couponId score 兑换码的最大序号
         redisTemplate.opsForZSet().add(COUPON_RANGE_KEY, coupon.getId().toString(), maxSerialNum);
+    }
+
+    @Override
+    public boolean updateExchangeCodeMark(long serialNum, boolean flag) {
+        String key = PromotionConstants.COUPON_CODE_MAP_KEY;
+        // 修改兑换码 的 自增id 对应的offset的值
+        Boolean aBoolean = redisTemplate.opsForValue().setBit(key, serialNum, flag);
+        return aBoolean != null && aBoolean;
     }
 
     public static void main(String[] args) {
