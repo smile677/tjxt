@@ -15,13 +15,17 @@ import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.IExchangeCodeService;
 import com.tianji.promotion.service.IUserCouponService;
 import com.tianji.promotion.utils.CodeUtil;
+import com.tianji.promotion.utils.RedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author smile67
@@ -34,6 +38,7 @@ import java.time.LocalDateTime;
 public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCoupon> implements IUserCouponService {
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
+    private final StringRedisTemplate redisTemplate;
 
     // 领取优惠券
     @Override
@@ -74,15 +79,28 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 
         // 3.生成用户券
         saveUserCoupon(userId, coupon);*/
-        // 提取函数为
-        synchronized (userId.toString().intern()) {
-            // 从aop上下文中 获取当前类的代理对象
-            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
-            // 这种写法是调用原对象
-//            checkAndCreateUserCoupon(userId, coupon, null);
-            // 调用代理对象的的方法，这种方法有事务处理
-            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+//        synchronized (userId.toString().intern()) {
+//            // 从aop上下文中 获取当前类的代理对象
+//            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+//            // 这种写法是调用原对象
+////            checkAndCreateUserCoupon(userId, coupon, null);
+//            // 调用代理对象的的方法，这种方法有事务处理
+//            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+//        }
+        String key = "lock:coupon:uid:" + userId;
+        RedisLock redisLock = new RedisLock(key, redisTemplate);
+        boolean isLock = redisLock.tryLock(5, TimeUnit.SECONDS);
+        if (!isLock) {
+            throw new BizIllegalException("请求太频繁");
         }
+        try {
+            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+        } finally {
+
+            redisLock.unlock();
+        }
+
     }
 
     @Override
@@ -178,7 +196,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                     .update();
         }
 //        }
-        throw new RuntimeException("故意报错");
+//        throw new RuntimeException("故意报错");
     }
 
     // 保存用户券
