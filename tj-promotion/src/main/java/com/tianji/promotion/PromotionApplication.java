@@ -9,6 +9,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.core.env.Environment;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -20,6 +21,7 @@ import java.net.UnknownHostException;
 @MapperScan("com.tianji.promotion.mapper")
 @EnableAsync
 @Slf4j
+@EnableTransactionManagement // 非必需
 public class PromotionApplication {
     public static void main(String[] args) throws UnknownHostException {
         SpringApplication app = new SpringApplicationBuilder(PromotionApplication.class).build(args);

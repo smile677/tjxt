@@ -15,6 +15,7 @@ import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.IExchangeCodeService;
 import com.tianji.promotion.service.IUserCouponService;
 import com.tianji.promotion.utils.CodeUtil;
+import com.tianji.promotion.utils.MyLock;
 import com.tianji.promotion.utils.RedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,20 +107,58 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 //        }
 
         // 通过 Redisson 实现分布式锁
-        String key = "lock:coupon:uid:" + userId;
-        RLock lock = redissonClient.getLock(key);
-        try {
-            // 看门狗机制会生效 默认失效时间是30s
-            boolean isLock = lock.tryLock();
-            if (!isLock) {
-                throw new BizIllegalException("请求太频繁~");
-            }
-            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
-            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
-        } finally {
-            lock.unlock();
-        }
+//        String key = "lock:coupon:uid:" + userId;
+//        RLock lock = redissonClient.getLock(key);
+//        try {
+//            // 看门狗机制会生效 默认失效时间是30s
+//            boolean isLock = lock.tryLock();
+//            if (!isLock) {
+//                throw new BizIllegalException("请求太频繁~");
+//            }
+//            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+//            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+//        } finally {
+//            lock.unlock();
+//        }
 
+        //  自定义分布式锁组件
+//        String key = "lock:coupon:uid:" + userId;
+        IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+        userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+
+    }
+
+    @MyLock(name = "lock:coupon:uid")
+    @Transactional
+    @Override
+
+    public void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
+        // Long类型 -128~127 之间是同一个对象 享元模式 超过该区间是不同的对象
+        // Long.toString 方法底层是new String 所以还是不同的对象
+        // Long.toString.intern() inter方法是强制从常量池中取出字符串
+//        synchronized (userId.toString().intern()) {
+        // 1.获取当前用户 对该优惠券 已领数量 user_coupon 判断是否超出限领数量
+        Integer count = this.lambdaQuery().eq(UserCoupon::getUserId, userId).eq(UserCoupon::getCouponId, coupon.getId()).count();
+        if (count != null && count >= coupon.getUserLimit()) {
+            throw new BizIllegalException("该优惠券领取次数已达到上限");
+        }
+        // 2.优惠券的已发数量+1
+//        coupon.setIssueNum(coupon.getIssueNum() + 1);
+//        couponMapper.updateById(coupon);
+        // 使用这种方式，考虑后面的并发控制
+        couponMapper.incrIssueNum(coupon.getId());
+        // 3.生成用户券
+        saveUserCoupon(userId, coupon);
+        // 4.更新兑换码状态
+        if (serialNum != null) {
+            exchangeCodeService.lambdaUpdate()
+                    .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
+                    .set(ExchangeCode::getUserId, userId)
+                    .eq(ExchangeCode::getId, serialNum)
+                    .update();
+        }
+//        }
+//        throw new RuntimeException("故意报错");
     }
 
     @Override
@@ -187,36 +226,6 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
         System.out.println(" (s5 == s6) = " + (s5 == s6));
     }
 
-    @Transactional
-    @Override
-    public void checkAndCreateUserCoupon(Long userId, Coupon coupon, Long serialNum) {
-        // Long类型 -128~127 之间是同一个对象 享元模式 超过该区间是不同的对象
-        // Long.toString 方法底层是new String 所以还是不同的对象
-        // Long.toString.intern() inter方法是强制从常量池中取出字符串
-//        synchronized (userId.toString().intern()) {
-        // 1.获取当前用户 对该优惠券 已领数量 user_coupon 判断是否超出限领数量
-        Integer count = this.lambdaQuery().eq(UserCoupon::getUserId, userId).eq(UserCoupon::getCouponId, coupon.getId()).count();
-        if (count != null && count >= coupon.getUserLimit()) {
-            throw new BizIllegalException("该优惠券领取次数已达到上限");
-        }
-        // 2.优惠券的已发数量+1
-//        coupon.setIssueNum(coupon.getIssueNum() + 1);
-//        couponMapper.updateById(coupon);
-        // 使用这种方式，考虑后面的并发控制
-        couponMapper.incrIssueNum(coupon.getId());
-        // 3.生成用户券
-        saveUserCoupon(userId, coupon);
-        // 4.更新兑换码状态
-        if (serialNum != null) {
-            exchangeCodeService.lambdaUpdate()
-                    .set(ExchangeCode::getStatus, ExchangeCodeStatus.USED)
-                    .set(ExchangeCode::getUserId, userId)
-                    .eq(ExchangeCode::getId, serialNum)
-                    .update();
-        }
-//        }
-//        throw new RuntimeException("故意报错");
-    }
 
     // 保存用户券
     private void saveUserCoupon(Long userId, Coupon coupon) {
