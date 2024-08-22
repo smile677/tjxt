@@ -7,6 +7,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.ThreadPoolExecutor;
 
+/**
+ * 自定义线程池
+ */
 @Slf4j
 @Configuration
 public class PromotionConfig {

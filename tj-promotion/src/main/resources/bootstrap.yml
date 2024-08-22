@@ -42,3 +42,5 @@ tj:
   auth:
     resource:
       enable: true
+      exclude-login-paths:
+        - /coupons/list #放行优惠券列表
