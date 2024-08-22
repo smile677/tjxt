@@ -33,7 +33,7 @@ public class RedissonConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean // 如果容器中存在RedissonClient，则不创建
     public RedissonClient redissonClient(RedisProperties properties){
         log.debug("尝试初始化RedissonClient");
         // 1.读取Redis配置

@@ -47,7 +47,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
-        <!--redisson-->
+        <!--redisson 依赖-->
         <dependency>
             <groupId>org.redisson</groupId>
             <artifactId>redisson</artifactId>
