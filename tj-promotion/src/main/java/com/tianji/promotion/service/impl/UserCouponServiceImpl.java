@@ -129,7 +129,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 //        coupon.setIssueNum(coupon.getIssueNum() + 1);
 //        couponMapper.updateById(coupon);
         // 使用这种方式，考虑后面的并发控制
-        couponMapper.incrIssueNum(coupon.getId());
+        couponMapper.incrIssueNum(coupon.getId(), coupon.getIssueNum());
         // 3.生成用户券
         saveUserCoupon(userId, coupon);
         // 4.更新兑换码状态

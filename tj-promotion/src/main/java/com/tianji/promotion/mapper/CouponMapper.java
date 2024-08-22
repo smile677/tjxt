@@ -4,7 +4,6 @@ import com.tianji.promotion.domain.po.Coupon;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
-import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * @author smile67
@@ -14,8 +13,8 @@ import org.springframework.web.bind.annotation.PathVariable;
  */
 public interface CouponMapper extends BaseMapper<Coupon> {
     // 更新优惠券已领取梳理
-    @Update("update coupon set issue_num = issue_num + 1 where id = #{id}")
-    void incrIssueNum(@Param("id") Long id);
+    @Update("update coupon set issue_num = issue_num + 1 where id = #{id} and issue_num = #{issueNum}")
+    void incrIssueNum(@Param("id") Long id, Integer issueNum);
 }
 
 
