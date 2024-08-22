@@ -21,7 +21,7 @@ class RedissonTest {
         RLock lock = redissonClient.getLock("anyLock");
         try {
             // 2.尝试获取锁，参数：waitTime、leaseTime、时间单位
-//            boolean isLock = lock.tryLock(1, 30, TimeUnit.SECONDS);
+//            boolean isLock = lock.tryLock(1, 30, TimeUnit.SECONDS); // 看门狗会失效
             // 看门狗机制不能设置失效时间 采用默认的失效时间30s
             boolean isLock = lock.tryLock();
             if (!isLock) {
@@ -33,7 +33,7 @@ class RedissonTest {
             TimeUnit.SECONDS.sleep(60);
         } finally {
             // 4.释放锁
-            lock.unlock();
+            lock.unlock(); // 底层有校验想要删的锁是否是自己的 即校验和删除两个操作是原子性的
         }
     }
 }
