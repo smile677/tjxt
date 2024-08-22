@@ -102,7 +102,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
                 throw new BizIllegalException("该兑换码已过期");
             }
             // 校验并生成用户券
-            Long userId = exchangeCode.getUserId();
+            Long userId = UserContext.getUser();
             Coupon coupon = couponMapper.selectById(exchangeCode.getExchangeTargetId());
             if (coupon == null) {
                 throw new BizIllegalException("该兑换码对应的优惠券不存在");
