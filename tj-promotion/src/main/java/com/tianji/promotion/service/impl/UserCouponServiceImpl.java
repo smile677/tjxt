@@ -18,6 +18,8 @@ import com.tianji.promotion.utils.CodeUtil;
 import com.tianji.promotion.utils.RedisLock;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -39,6 +41,7 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
     private final CouponMapper couponMapper;
     private final IExchangeCodeService exchangeCodeService;
     private final StringRedisTemplate redisTemplate;
+    private final RedissonClient redissonClient;
 
     // 领取优惠券
     @Override
@@ -87,18 +90,34 @@ public class UserCouponServiceImpl extends ServiceImpl<UserCouponMapper, UserCou
 //            // 调用代理对象的的方法，这种方法有事务处理
 //            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
 //        }
+        // 通过工具类的方式手动实现分布式锁
+//        String key = "lock:coupon:uid:" + userId;
+//        RedisLock redisLock = new RedisLock(key, redisTemplate);
+//        boolean isLock = redisLock.tryLock(5, TimeUnit.SECONDS);
+//        if (!isLock) {
+//            throw new BizIllegalException("请求太频繁");
+//        }
+//        try {
+//            IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
+//            userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
+//        } finally {
+//
+//            redisLock.unlock();
+//        }
+
+        // 通过 Redisson 实现分布式锁
         String key = "lock:coupon:uid:" + userId;
-        RedisLock redisLock = new RedisLock(key, redisTemplate);
-        boolean isLock = redisLock.tryLock(5, TimeUnit.SECONDS);
-        if (!isLock) {
-            throw new BizIllegalException("请求太频繁");
-        }
+        RLock lock = redissonClient.getLock(key);
         try {
+            // 看门狗机制会生效 默认失效时间是30s
+            boolean isLock = lock.tryLock();
+            if (!isLock) {
+                throw new BizIllegalException("请求太频繁~");
+            }
             IUserCouponService userCouponServiceProxy = (IUserCouponService) AopContext.currentProxy();
             userCouponServiceProxy.checkAndCreateUserCoupon(userId, coupon, null);
         } finally {
-
-            redisLock.unlock();
+            lock.unlock();
         }
 
     }

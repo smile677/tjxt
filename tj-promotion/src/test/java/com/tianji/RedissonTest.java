@@ -33,7 +33,7 @@ class RedissonTest {
             TimeUnit.SECONDS.sleep(60);
         } finally {
             // 4.释放锁
-//            lock.unlock();
+            lock.unlock();
         }
     }
 }
