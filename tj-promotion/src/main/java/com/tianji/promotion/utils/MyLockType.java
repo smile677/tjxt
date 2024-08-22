@@ -1,4 +1,4 @@
-package com.tianji.promotion.enums;
+package com.tianji.promotion.utils;
 
 public enum MyLockType {
     // 可重入锁

@@ -1,7 +1,5 @@
 package com.tianji.promotion.utils;
 
-import com.tianji.promotion.enums.MyLockType;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -24,7 +22,15 @@ public @interface MyLock {
 
     /**
      * 代表锁类型 默认可重入
+     *
      * @return
      */
     MyLockType lockType() default MyLockType.RE_ENTRANT_LOCK;
+
+    /**
+     * 代表获取锁的失败策略
+     * 默认：
+     * 重试超时后失败: 有限重试(RETRY_TIMEOUT(boolean isLock=lock.tryLock(5,10,SECONDS)))+抛出异常FAIL(if(!isLock)throw new Exception)
+     */
+    MyLockStrategy lockStrategy() default MyLockStrategy.FAIL_AFTER_RETRY_TIMEOUT;
 }

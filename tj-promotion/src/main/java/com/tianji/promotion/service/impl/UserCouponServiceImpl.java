@@ -10,7 +10,7 @@ import com.tianji.promotion.domain.po.ExchangeCode;
 import com.tianji.promotion.domain.po.UserCoupon;
 import com.tianji.promotion.enums.CouponStatus;
 import com.tianji.promotion.enums.ExchangeCodeStatus;
-import com.tianji.promotion.enums.MyLockType;
+import com.tianji.promotion.utils.MyLockType;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.mapper.UserCouponMapper;
 import com.tianji.promotion.service.IExchangeCodeService;

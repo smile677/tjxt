@@ -1,6 +1,5 @@
 package com.tianji.promotion.utils;
 
-import com.tianji.common.exceptions.BizIllegalException;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -30,19 +29,14 @@ public class MyLockAspect implements Order {
         RLock lock = myLockFactory.getLock(mylock.lockType(), mylock.name());
 
         // 2.尝试获取锁，参数：waitTime、leaseTime、时间单位
-        boolean isLock = lock.tryLock(mylock.waitTime(), mylock.leaseTime(), mylock.unit());
+        boolean isLock = mylock.lockStrategy().tryLock(lock, mylock);
 
+        if (!isLock) {
+            return null;
+        }
         // 3.判断是否成功
         try {
-            // 3.1 失败快速结束
-            if (!isLock) {
-                // 获取锁失败处理 ..
-                throw new BizIllegalException("请求太频繁");
-            } else {
-                // 3.2 成功，快速结束
-                return joinPoint.proceed();
-                // 获取锁成功处理
-            }
+            return joinPoint.proceed();
         } finally {
             // 4.释放锁
             lock.unlock(); // 底层有校验想要删的锁是否是自己的 即校验和删除两个操作是原子性的
