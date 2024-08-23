@@ -5,8 +5,11 @@ public interface PromotionConstants {
     String COUPON_CODE_SERIAL_KEY = "coupon:code:serial";
     // 检验兑换码是否兑换 借助于redis bitmap
     String COUPON_CODE_MAP_KEY = "coupon:code:map";
+
+    // 领取优惠券的key
     String COUPON_CACHE_KEY_PREFIX = "prs:coupon:";
-    String COUPON_COUPON_CACHE_KEY_PREFIX = "prs:user:coupon:";
+    String USER_COUPON_CACHE_KEY_PREFIX = "prs:user:coupon:";
+
     String COUPON_RANGE_KEY = "coupon:code:range";
     String[] RECEIVE_COUPON_ERROR_MSG = {
             "活动未开始",

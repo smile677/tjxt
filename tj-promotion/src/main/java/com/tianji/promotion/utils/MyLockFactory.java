@@ -14,7 +14,12 @@ public class MyLockFactory {
 
     public MyLockFactory(RedissonClient redissonClient) {
         this.lockHandlers = new EnumMap<>(MyLockType.class);
-        this.lockHandlers.put(MyLockType.RE_ENTRANT_LOCK, redissonClient::getLock);
+        this.lockHandlers.put(MyLockType.RE_ENTRANT_LOCK, new Function<String, RLock>() {
+            @Override
+            public RLock apply(String name) {
+                return redissonClient.getLock(name);
+            }
+        });
         this.lockHandlers.put(MyLockType.FAIR_LOCK, redissonClient::getFairLock);
         this.lockHandlers.put(MyLockType.READ_LOCK, name -> redissonClient.getReadWriteLock(name).readLock());
         this.lockHandlers.put(MyLockType.WRITE_LOCK, name -> redissonClient.getReadWriteLock(name).writeLock());
