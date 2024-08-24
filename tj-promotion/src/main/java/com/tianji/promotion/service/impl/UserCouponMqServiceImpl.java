@@ -369,9 +369,53 @@ public class UserCouponMqServiceImpl extends ServiceImpl<UserCouponMapper, UserC
         }
 
         // 6.筛选最优解
+        return findBestSolution(dtoList);
+    }
 
-
-        return dtoList;
+    /**
+     * 筛选最优解
+     * - 用卷相同时，优惠金额最大的方案
+     * - 优惠金额相同时，用卷最少的方案
+     *
+     * @param solutions
+     * @return
+     */
+    private List<CouponDiscountDTO> findBestSolution(List<CouponDiscountDTO> solutions) {
+        // 1.创建两个map 分别记录用券相同，金额最高 金额相同，用卷最小
+        Map<String, CouponDiscountDTO> moreDiscountMap = new HashMap<>();
+        Map<Integer, CouponDiscountDTO> lessCouponMap = new HashMap<>();
+        // 2.循环方案 向map中记录 用券相同，金额最高 金额相同，用卷最小
+        for (CouponDiscountDTO solution : solutions) {
+            // 2.1 对优惠券id 升序 转字符串 然后逗号拼接
+            String ids = solution.getIds()
+                    .stream()
+                    .sorted(Comparator.comparing(Long::valueOf))
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            // 2.2 从moreDiscountMap中取 旧的记录 判断 旧的方案金额 大于等于  当前的优惠金额 当前方案忽略 处理下一个方案
+            CouponDiscountDTO old = moreDiscountMap.get(ids);
+            if (old != null && old.getDiscountAmount() >= solution.getDiscountAmount()) {
+                continue;
+            }
+            // 2.3 从lessCouponMap中取  旧的记录 判断 旧的方案用券数量 小于 当前方案数量 当前方案忽略  处理下一个方案
+            old = lessCouponMap.get(solution.getDiscountAmount());
+            int newSize = solution.getIds().size();
+            if (old != null && newSize > 1 && old.getIds().size() <= newSize) {
+                continue;
+            }
+            // 2.4 添加更优方案到map中
+            // 说明当前方案 更优
+            moreDiscountMap.put(ids, solution);
+            // 说明当前方案 更优
+            lessCouponMap.put(solution.getDiscountAmount(), solution);
+        }
+        // 3.求两个map的交集
+        Collection<CouponDiscountDTO> bestSolution = CollUtils.intersection(moreDiscountMap.values(), lessCouponMap.values());
+        // 4.对最终的方案结果 按照优惠金额 倒序
+        List<CouponDiscountDTO> latestBestSolution = bestSolution.stream()
+                .sorted(Comparator.comparing(CouponDiscountDTO::getDiscountAmount).reversed())
+                .collect(Collectors.toList());
+        return latestBestSolution;
     }
 
     /**
