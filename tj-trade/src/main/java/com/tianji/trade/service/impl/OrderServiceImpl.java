@@ -193,8 +193,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         int total = courseInfos.stream().mapToInt(CourseSimpleInfoDTO::getPrice).sum();
         // TODO 3.计算折扣
         int discountAmount = 0;
-        // 4.生成订单id
-        long orderId = IdWorker.getId();
+        // 4.生成订单id 雪花算法生成的主键
+        long orderId = IdWorker.getId(); //
         // 5.组织返回
         OrderConfirmVO vo = new OrderConfirmVO();
         vo.setOrderId(orderId);

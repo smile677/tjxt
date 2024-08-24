@@ -7,22 +7,26 @@ import com.tianji.common.constants.MqConstants;
 import com.tianji.common.exceptions.BadRequestException;
 import com.tianji.common.exceptions.BizIllegalException;
 import com.tianji.common.utils.BeanUtils;
+import com.tianji.common.utils.CollUtils;
 import com.tianji.common.utils.StringUtils;
 import com.tianji.common.utils.UserContext;
 import com.tianji.promotion.constants.PromotionConstants;
+import com.tianji.promotion.domain.dto.CouponDiscountDTO;
+import com.tianji.promotion.domain.dto.OrderCourseDTO;
 import com.tianji.promotion.domain.dto.UserCouponDTO;
 import com.tianji.promotion.domain.po.Coupon;
+import com.tianji.promotion.domain.po.CouponScope;
 import com.tianji.promotion.domain.po.ExchangeCode;
 import com.tianji.promotion.domain.po.UserCoupon;
 import com.tianji.promotion.enums.ExchangeCodeStatus;
 import com.tianji.promotion.mapper.CouponMapper;
 import com.tianji.promotion.mapper.UserCouponMapper;
+import com.tianji.promotion.service.ICouponScopeService;
 import com.tianji.promotion.service.IExchangeCodeService;
 import com.tianji.promotion.service.IUserCouponService;
-import com.tianji.promotion.utils.CodeUtil;
-import com.tianji.promotion.utils.MyLock;
-import com.tianji.promotion.utils.MyLockStrategy;
-import com.tianji.promotion.utils.MyLockType;
+import com.tianji.promotion.strategy.discount.Discount;
+import com.tianji.promotion.strategy.discount.DiscountStrategy;
+import com.tianji.promotion.utils.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
@@ -31,7 +35,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author smile67
@@ -47,6 +52,7 @@ public class UserCouponMqServiceImpl extends ServiceImpl<UserCouponMapper, UserC
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
     private final RabbitMqHelper mqHelper;
+    private final ICouponScopeService couponScopeService;
 
     // 领取优惠券
     @Override
@@ -235,6 +241,218 @@ public class UserCouponMqServiceImpl extends ServiceImpl<UserCouponMapper, UserC
         }
         // 3.新增一个用户券
         saveUserCoupon(msg.getUserId(), coupon);
+    }
+
+    @Override
+    public List<CouponDiscountDTO> findDiscountSolution(List<OrderCourseDTO> courseDTOS) {
+        // 1.查询当前用户可用的优惠券 coupon和user_coupon表 条件：userId、status=1 字段：优惠券规则、优惠券id、用户券id(提交订单的时候需要用)
+        List<Coupon> coupons = getBaseMapper().queryMyCoupons(UserContext.getUser());
+        log.debug("当前用户的优惠券共有{}张", coupons.size());
+        for (Coupon coupon : coupons) {
+            log.debug("优惠券：{}, {}",
+                    DiscountStrategy.getDiscount(coupon.getDiscountType()).getRule(coupon),
+                    coupon);
+        }
+
+        // 2.初筛
+        // 2.1 计算订单的总金额 对courseDTO的price累加
+//        int totalAmout = 0;
+//        for (OrderCourseDTO courseDTO : courseDTOS) {
+//            totalAmout += courseDTO.getPrice();
+//        }
+        int totalAmount = courseDTOS.stream().mapToInt(OrderCourseDTO::getPrice).sum();
+        log.debug("订单总金额：{}", totalAmount);
+
+        // 2.2 校验优惠券是否可用
+//        List<Coupon> availableCouponList = new ArrayList<>();
+//        for (Coupon coupon : coupons) {
+//            boolean flag = DiscountStrategy.getDiscount(coupon.getDiscountType()).canUse(totalAmout, coupon);
+//            if (flag) {
+//                availableCouponList.add(coupon);
+//            }
+//        }
+        List<Coupon> availableCouponList = coupons.stream()
+                .filter(coupon -> DiscountStrategy.getDiscount(coupon.getDiscountType()).canUse(totalAmount, coupon))
+                .collect(Collectors.toList());
+        if (CollUtils.isEmpty(availableCouponList)) {
+            return CollUtils.emptyList();
+        }
+        log.debug("经过初筛之后，还剩{}张", availableCouponList.size());
+        for (Coupon coupon : availableCouponList) {
+            log.debug("优惠券：{}, {}",
+                    DiscountStrategy.getDiscount(coupon.getDiscountType()).getRule(coupon),
+                    coupon);
+        }
+
+
+        // 3.细筛（考虑优惠券的限定范围） 排列组合
+        Map<Coupon, List<OrderCourseDTO>> avaMap = findAvailableCoupons(availableCouponList, courseDTOS);
+        if (avaMap.isEmpty()) {
+            return CollUtils.emptyList();
+        }
+        Set<Map.Entry<Coupon, List<OrderCourseDTO>>> entries = avaMap.entrySet();
+        for (Map.Entry<Coupon, List<OrderCourseDTO>> entry : entries) {
+            log.debug("经过细筛之后优惠券：{}, {}",
+                    DiscountStrategy.getDiscount(entry.getKey().getDiscountType()).getRule(entry.getKey()),
+                    entry.getKey());
+        }
+        availableCouponList = new ArrayList<>(avaMap.keySet());
+        log.debug("经过细筛之后,真正的可用的优惠券个数：{}", availableCouponList.size());
+        for (Coupon coupon : availableCouponList) {
+            log.debug("优惠券：{}, {}",
+                    DiscountStrategy.getDiscount(coupon.getDiscountType()).getRule(coupon),
+                    coupon);
+        }
+        // 排列组合
+        List<List<Coupon>> solutions = PermuteUtil.permute(availableCouponList);
+        for (Coupon availableCoupon : availableCouponList) {
+            // 添加单卷到方案中
+            solutions.add(List.of(availableCoupon));
+        }
+        log.debug("排列组合");
+        for (List<Coupon> solution : solutions) {
+            List<Long> cIds = solution.stream().map(Coupon::getId).collect(Collectors.toList());
+            log.debug("{}", cIds);
+        }
+
+        // 4.计算每一种组合的优惠明细
+        log.debug("开始计算 每一种组合的优惠明细");
+        List<CouponDiscountDTO> dtoList = new ArrayList<>();
+        for (List<Coupon> solution : solutions) {
+            CouponDiscountDTO dto = calculateSolutionDiscount(avaMap, courseDTOS, solution);
+            log.debug("优惠方案最终优惠：{} 方案中使用了那些ids有{} 规则{}", dto.getDiscountAmount(), dto.getIds(), dto.getRules());
+            dtoList.add(dto);
+        }
+
+
+        // 5.使用多线程改造第4步 并行计算每一种组合的优惠明细
+
+
+        // 6.筛选最优解
+        return dtoList;
+    }
+
+    /**
+     * 计算每一个优惠的 优惠信息
+     *
+     * @param avaMap     优惠券和可用课程的映射集合
+     * @param courseDTOS 订单中所有的课程
+     * @param solutions  方案
+     * @return
+     */
+    private CouponDiscountDTO calculateSolutionDiscount(Map<Coupon, List<OrderCourseDTO>> avaMap,
+                                                        List<OrderCourseDTO> courseDTOS,
+                                                        List<Coupon> solutions) {
+        // 1.创建  方案结果dto对象
+        CouponDiscountDTO dto = new CouponDiscountDTO();
+        // 2.初始化商品id和商品折扣明细的映射，初筛的折扣明细全部都设置为0
+        Map<Long, Integer> detailMap = courseDTOS.stream().collect(Collectors.toMap(OrderCourseDTO::getId, orderCourseDTO -> 0));
+        // 3.计算该方案的优惠信息
+        // 3.1循环方案中优惠券
+        for (Coupon coupon : solutions) {
+            // 3.2取出该优惠券对应的可用课程
+            List<OrderCourseDTO> availableCourses = avaMap.get(coupon);
+            // 3.3计算可用课程的总金额(商品价格-该商品的折扣明细)
+            int totalAmount = availableCourses
+                    .stream()
+                    .mapToInt(value -> value.getPrice() - detailMap.get(value.getId())).sum();
+            // 3.4判断优惠券是否可用
+            Discount discount = DiscountStrategy.getDiscount(coupon.getDiscountType());
+            if (!discount.canUse(totalAmount, coupon)) {
+                // 卷不可用，跳出循环，继续处理下一个卷
+                continue;
+            }
+            // 3.5计算该优惠券使用后的折扣值
+            int discountAmount = discount.calculateDiscount(totalAmount, coupon);
+            // 3.6更新商品的折扣明细(更新商品id的商品折扣明细) 更新到detailMap中
+            calculateDetailDiscount(detailMap, availableCourses, totalAmount, discountAmount);
+            // 3.7累加每一个优惠券的优惠金额 赋值给方案结果CouponDiscountDTO对象的discountAmount字段
+            // 只要执行到当前这句话，就意味着这个优惠券生效了
+            dto.getIds().add(coupon.getId());
+            dto.getRules().add(discount.getRule(coupon));
+            // 不能覆盖，应该是所有生效的优惠券累加的结果
+            dto.setDiscountAmount(dto.getDiscountAmount() + discountAmount);
+        }
+
+
+        return null;
+    }
+
+    /**
+     * 计算商品 折扣明细
+     *
+     * @param detailMap        商品id和商品的优惠明细 映射
+     * @param availableCourses 当前优惠券可用的课程集合
+     * @param totalAmount      可用的课程的总金额
+     * @param discountAmount   当前优惠券能优惠的金额
+     */
+    private void calculateDetailDiscount(Map<Long, Integer> detailMap,
+                                         List<OrderCourseDTO> availableCourses,
+                                         int totalAmount,
+                                         int discountAmount) {
+        // 目的: 本方法就是优惠券在使用后 计算每个商品的折扣明细
+        // 规则: 前面的商品按照比例计算，最后一个商品折扣明细 = 总结的优惠金额-前面商品的优惠的总金额
+        // 循环可用的商品
+        int times = 0;// 代表已处理的商品个数
+        int remainDiscount = discountAmount;// 代表剩余的钱
+        for (OrderCourseDTO availableCourse : availableCourses) {
+            times++;
+            int discount = 0;
+            if (times == availableCourses.size()) {
+                // 说明是最后一个课程
+                discount = remainDiscount;
+            } else {
+                // 是前面的课程 按照比例计算 先乘再除
+                discount = availableCourse.getPrice() * discountAmount / totalAmount;
+                remainDiscount = remainDiscount - discount;
+            }
+            // 将商品的折扣明细添加到detailMap中
+            detailMap.put(availableCourse.getId(), discount + detailMap.get(availableCourse.getId()));
+        }
+
+    }
+
+    /**
+     * 细筛，查询每一个优惠券 对应的可用课程
+     *
+     * @param availableCouponList 初筛之后的优惠券集合
+     * @param orderCourses        订单中的课程集合
+     * @return
+     */
+    private Map<Coupon, List<OrderCourseDTO>> findAvailableCoupons(List<Coupon> availableCouponList, List<OrderCourseDTO> orderCourses) {
+        Map<Coupon, List<OrderCourseDTO>> map = new HashMap<>();
+        // 1.循环遍历初筛后的优惠券集合
+        List<OrderCourseDTO> availableCourses = orderCourses;
+        for (Coupon coupon : availableCouponList) {
+            // 2.找出每一个优惠券的可以课程
+            // 2.1判断优惠券是否限定了范围 coupon.specific=true
+            if (coupon.getSpecific()) {
+                // 2.2查询限定范围 查coupon_scope表 表的条件：couponId
+                List<CouponScope> couponScopeList = couponScopeService.lambdaQuery()
+                        .eq(CouponScope::getCouponId, coupon.getId())
+                        .list();
+                // 2.3得到限定范围id集合
+                List<Long> couponScopeIds = couponScopeList.stream().map(CouponScope::getBizId).collect(Collectors.toList());
+                // 2.4从orderCourses订单中所有的课程集合 筛选 出该范围的课程
+                availableCourses = orderCourses
+                        .stream()
+                        .filter(orderCourseDTO -> couponScopeIds.contains(orderCourseDTO.getCateId())).collect(Collectors.toList());
+            }
+            if (CollUtils.isEmpty(availableCouponList)) {
+                // 说明当前优惠券限定了范围，但是在订单中的课程没有找到可用课程，说明该卷不可用，忽略该卷，进行下一个优惠券的处理
+                continue;
+            }
+            // 3.计算该优惠券 可用课程的总金额
+            int totalAmount = availableCourses.stream().mapToInt(OrderCourseDTO::getPrice).sum();
+
+            // 4.判断该优惠券是否可用 如果可用添加到map中
+            Discount discount = DiscountStrategy.getDiscount(coupon.getDiscountType());
+            if (discount.canUse(totalAmount, coupon)) {
+                map.put(coupon, availableCourses);
+
+            }
+        }
+        return map;
     }
 
     @Override
