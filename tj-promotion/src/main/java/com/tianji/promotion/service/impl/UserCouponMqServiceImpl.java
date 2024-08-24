@@ -38,6 +38,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -58,6 +59,7 @@ public class UserCouponMqServiceImpl extends ServiceImpl<UserCouponMapper, UserC
     private final RedissonClient redissonClient;
     private final RabbitMqHelper mqHelper;
     private final ICouponScopeService couponScopeService;
+    private final Executor calculteSolutionExecutor;
 
     // 领取优惠券
     @Override
@@ -349,7 +351,7 @@ public class UserCouponMqServiceImpl extends ServiceImpl<UserCouponMapper, UserC
                     CouponDiscountDTO dto = calculateSolutionDiscount(avaMap, courseDTOS, solution);
                     return dto;
                 }
-            }).thenAccept(new Consumer<CouponDiscountDTO>() {
+            }, calculteSolutionExecutor).thenAccept(new Consumer<CouponDiscountDTO>() {
                 @Override
                 public void accept(CouponDiscountDTO dto) {
                     dtoList.add(dto);

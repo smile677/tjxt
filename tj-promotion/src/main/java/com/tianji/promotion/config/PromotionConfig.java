@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
 
 /**
@@ -28,5 +29,21 @@ public class PromotionConfig {
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
+    }
+    @Bean
+    public Executor calculteSolutionExecutor(){
+        ThreadPoolTaskExecutor refundExecutor = new ThreadPoolTaskExecutor();
+        //配置核心线程数
+        refundExecutor.setCorePoolSize(10);
+        //配置最大线程数
+        refundExecutor.setMaxPoolSize(10);
+        //配置队列大小
+        refundExecutor.setQueueCapacity(200);
+        //配置线程池中的线程的名称前缀
+        refundExecutor.setThreadNamePrefix("calculte-solution-handler-");
+        // 由调用者线程执行
+        refundExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        refundExecutor.initialize();
+        return refundExecutor;
     }
 }
