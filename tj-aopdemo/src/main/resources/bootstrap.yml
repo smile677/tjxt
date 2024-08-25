@@ -1,0 +1,7 @@
+server:
+  port: 8099  #端口
+  tomcat:
+    uri-encoding: UTF-8   #服务编码
+spring:
+  application:
+    name: xxljobdemo-serviceXxlJobDemoApplication

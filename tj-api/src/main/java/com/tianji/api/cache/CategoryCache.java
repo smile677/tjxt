@@ -31,6 +31,7 @@ public class CategoryCache {
         });
     }
 
+    // 根据分类的id集合 获取分类的名称
     public String getCategoryNames(List<Long> ids) {
         if (ids == null || ids.size() == 0) {
             return "";

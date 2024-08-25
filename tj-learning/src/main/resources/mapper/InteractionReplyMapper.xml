@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tianji.learning.mapper.InteractionReplyMapper">
+
+    <resultMap id="BaseResultMap" type="com.tianji.learning.domain.po.InteractionReply">
+            <id property="id" column="id" jdbcType="BIGINT"/>
+            <result property="questionId" column="question_id" jdbcType="BIGINT"/>
+            <result property="answerId" column="answer_id" jdbcType="BIGINT"/>
+            <result property="userId" column="user_id" jdbcType="BIGINT"/>
+            <result property="content" column="content" jdbcType="VARCHAR"/>
+            <result property="targetUserId" column="target_user_id" jdbcType="BIGINT"/>
+            <result property="targetReplyId" column="target_reply_id" jdbcType="BIGINT"/>
+            <result property="replyTimes" column="reply_times" jdbcType="INTEGER"/>
+            <result property="likedTimes" column="liked_times" jdbcType="INTEGER"/>
+            <result property="hidden" column="hidden" jdbcType="BIT"/>
+            <result property="anonymity" column="anonymity" jdbcType="BIT"/>
+            <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+            <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,question_id,answer_id,
+        user_id,content,target_user_id,
+        target_reply_id,reply_times,liked_times,
+        hidden,anonymity,create_time,
+        update_time
+    </sql>
+</mapper>

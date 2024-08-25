@@ -1,0 +1,51 @@
+server:
+  port: 8092  #端口
+  tomcat:
+    uri-encoding: UTF-8   #服务编码
+spring:
+  profiles:
+    active: dev
+  application:
+    name: promotion-service
+  cloud:
+    nacos:
+      config:
+        file-extension: yaml
+        shared-configs: # 共享配置
+          - data-id: shared-spring.yaml # 共享spring配置
+            refresh: false
+          - data-id: shared-redis.yaml # 共享redis配置
+            refresh: false
+          - data-id: shared-mybatis.yaml # 共享mybatis配置
+            refresh: false
+          - data-id: shared-logs.yaml # 共享日志配置
+            refresh: false
+          - data-id: shared-feign.yaml # 共享feign配置
+            refresh: false
+          - data-id: shared-mq.yaml # 共享mq配置
+            refresh: false
+          - data-id: shared-xxljob.yaml # 共享xxljob配置
+            refresh: false
+tj:
+  swagger:
+    enable: true
+    enableResponseWrap: true
+    package-path: com.tianji.promotion.controller
+    title: 天机学堂 - 促销中心接口文档
+    description: 该服务包含促销的各种辅助功能
+    contact-name: smile67
+    contact-url: http://www.github.com/smile677
+    contact-email: 1639316332@qq.com
+    version: v1.0
+  jdbc:
+    database: tj_promotion
+  auth:
+    resource:
+      enable: true
+      exclude-login-paths:
+        - /coupons/list #放行优惠券列表
+  mq:
+    listener:
+      retry:
+        # true 无状态 false 有状态 如果业务中包含事务 这里改为false
+        stateless: false
